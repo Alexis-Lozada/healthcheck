@@ -1,0 +1,283 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tablas de autenticación (existentes)
+model Usuario {
+  id              Int       @id @default(autoincrement())
+  email           String    @unique
+  nombre          String?
+  telefono        String?
+  rol             String    @default("usuario") // Ahora como String en lugar de enum
+  fecha_registro  DateTime  @default(now())
+  ultima_conexion DateTime?
+  activo          Boolean   @default(true)
+  contrasena      String?   // Puede ser nulo para usuarios que se registran con Google
+
+  // Relaciones para NextAuth
+  cuentas         Cuenta[]
+  sesiones        Sesion[]
+
+  // Relaciones con las tablas anteriores
+  preferencias      PreferenciasUsuario?
+  historialConsultas HistorialConsulta[]
+  interacciones     InteraccionNoticia[]
+
+  @@map("usuarios")
+}
+
+model Cuenta {
+  id                String  @id @default(cuid())
+  usuarioId         Int
+  tipo              String
+  proveedor         String
+  proveedorCuentaId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([proveedor, proveedorCuentaId])
+  @@map("cuentas")
+}
+
+model Sesion {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  usuarioId    Int
+  expires      DateTime
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("sesiones")
+}
+
+model TokenVerificacion {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("tokens_verificacion")
+}
+
+// Tablas anteriores (a recrear)
+model Tema {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  activo      Boolean   @default(true)
+  noticias    Noticia[]
+
+  @@map("temas")
+}
+
+model Fuente {
+  id             Int       @id @default(autoincrement())
+  nombre         String
+  url            String?
+  confiabilidad  Float?    @default(0)
+  verificada     Boolean   @default(false)
+  descripcion    String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  noticias       Noticia[]
+  reportes       ReporteFuente[]
+
+  @@map("fuentes")
+}
+
+model Noticia {
+  id               Int       @id @default(autoincrement())
+  titulo           String
+  contenido        String    @db.Text
+  url              String?
+  fecha_publicacion DateTime?
+  fuente_id        Int?
+  tema_id          Int?
+  fecha_analisis   DateTime?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  
+  fuente           Fuente?   @relation(fields: [fuente_id], references: [id])
+  tema             Tema?     @relation(fields: [tema_id], references: [id])
+  
+  clasificaciones  ClasificacionNoticia[]
+  interacciones    InteraccionNoticia[]
+  keywords         NoticiaKeyword[]
+  historial        HistorialConsulta[]
+
+  @@map("noticias")
+}
+
+model ClasificacionNoticia {
+  id                Int       @id @default(autoincrement())
+  noticia_id        Int
+  modelo_id         Int?
+  resultado         String?
+  confianza         Float?
+  explicacion       String?   @db.Text
+  fecha_clasificacion DateTime @default(now())
+
+  noticia           Noticia   @relation(fields: [noticia_id], references: [id])
+  modelo            ModeloML? @relation(fields: [modelo_id], references: [id])
+
+  @@map("clasificacion_noticias")
+}
+
+model ModeloML {
+  id               Int       @id @default(autoincrement())
+  nombre           String
+  version          String?
+  descripcion      String?   @db.Text
+  fecha_entrenamiento DateTime?
+  metricas         String?   @db.Text
+  activo           Boolean   @default(true)
+  
+  clasificaciones  ClasificacionNoticia[]
+
+  @@map("modelos_ml")
+}
+
+model InteraccionNoticia {
+  id               Int       @id @default(autoincrement())
+  usuario_id       Int
+  noticia_id       Int
+  tipo_interaccion String    // "like", "dislike", "share", "report", etc.
+  fecha_interaccion DateTime @default(now())
+
+  usuario          Usuario   @relation(fields: [usuario_id], references: [id])
+  noticia          Noticia   @relation(fields: [noticia_id], references: [id])
+
+  @@map("interacciones_noticia")
+}
+
+model Keyword {
+  id               Int       @id @default(autoincrement())
+  palabra          String    @unique
+  relevancia       Float?
+  
+  noticias         NoticiaKeyword[]
+
+  @@map("keywords")
+}
+
+model NoticiaKeyword {
+  id               Int       @id @default(autoincrement())
+  noticia_id       Int
+  keyword_id       Int
+  
+  noticia          Noticia   @relation(fields: [noticia_id], references: [id])
+  keyword          Keyword   @relation(fields: [keyword_id], references: [id])
+
+  @@unique([noticia_id, keyword_id])
+  @@map("noticias_keywords")
+}
+
+model HistorialConsulta {
+  id               Int       @id @default(autoincrement())
+  usuario_id       Int
+  noticia_id       Int
+  fecha_consulta   DateTime  @default(now())
+
+  usuario          Usuario   @relation(fields: [usuario_id], references: [id])
+  noticia          Noticia   @relation(fields: [noticia_id], references: [id])
+
+  @@map("historial_consultas")
+}
+
+model PreferenciasUsuario {
+  id               Int       @id @default(autoincrement())
+  usuario_id       Int       @unique
+  temas_interes    String?   @db.Text  // JSON o array serializado
+  fuentes_confianza String?  @db.Text  // JSON o array serializado
+  frecuencia_notificacion String? // "diaria", "semanal", etc.
+  modo_oscuro      Boolean?  @default(false)
+  
+  usuario          Usuario   @relation(fields: [usuario_id], references: [id])
+
+  @@map("preferencias_usuario")
+}
+
+model MaterialEducativo {
+  id               Int       @id @default(autoincrement())
+  titulo           String
+  contenido        String    @db.Text
+  tipo             String    // "artículo", "video", "infografía", etc.
+  url              String?
+  fecha_publicacion DateTime @default(now())
+  activo           Boolean   @default(true)
+
+  @@map("material_educativo")
+}
+
+model ReporteFuente {
+  id               Int       @id @default(autoincrement())
+  fuente_id        Int
+  periodo_inicio   DateTime
+  periodo_fin      DateTime
+  total_noticias   Int?
+  porcentaje_veracidad Float?
+  observaciones    String?   @db.Text
+  
+  fuente           Fuente    @relation(fields: [fuente_id], references: [id])
+
+  @@map("reportes_fuente")
+}
+
+model ConfiguracionSistema {
+  id               Int       @id @default(autoincrement())
+  clave            String    @unique
+  valor            String    @db.Text
+  descripcion      String?
+  actualizado_por  String?
+  fecha_actualizacion DateTime @default(now())
+
+  @@map("configuracion_sistema")
+}
+
+model LogSistema {
+  id               Int       @id @default(autoincrement())
+  nivel            String    // "info", "warning", "error", etc.
+  mensaje          String    @db.Text
+  origen           String?   // componente o módulo que generó el log
+  detalles         String?   @db.Text
+  fecha            DateTime  @default(now())
+  
+  @@map("logs_sistema")
+}
+
+model ChatbotQA {
+  id               Int       @id @default(autoincrement())
+  pregunta         String    @db.Text
+  respuesta        String    @db.Text
+  categoria        String?
+  fecha_creacion   DateTime  @default(now())
+  activo           Boolean   @default(true)
+  
+  @@map("chatbot_qa")
+}
+
+model Notificacion {
+  id               Int       @id @default(autoincrement())
+  usuario_id       Int?
+  titulo           String
+  mensaje          String    @db.Text
+  leida            Boolean   @default(false)
+  fecha_envio      DateTime  @default(now())
+  fecha_lectura    DateTime?
+  tipo             String?   // "system", "news", "alert", etc.
+  
+  @@map("notificaciones")
+}
