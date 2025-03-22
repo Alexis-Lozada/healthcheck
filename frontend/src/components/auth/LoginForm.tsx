@@ -29,8 +29,12 @@ const LoginForm = () => {
       
       // Redirección después de login exitoso - se implementará más adelante
       // router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Ocurrió un error durante el inicio de sesión');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Ocurrió un error durante el inicio de sesión');
+      }
     } finally {
       setIsLoading(false);
     }
