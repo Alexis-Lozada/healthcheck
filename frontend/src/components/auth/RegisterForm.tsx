@@ -3,16 +3,21 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { register } from '@/services/authService';
 import { useAuth } from '@/context/AuthContext';
 
 // Definimos la URL base de la API de autenticación
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
-const LoginForm = () => {
+const RegisterForm = () => {
   const router = useRouter();
   const { login } = useAuth();
+  
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -21,34 +26,29 @@ const LoginForm = () => {
     setIsLoading(true);
     setError('');
 
+    // Validación básica
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // Enviar solicitud de login al backend
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, contrasena: password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al iniciar sesión');
-      }
+      // Enviar solicitud de registro al backend
+      const response = await register(email, name, password, phone);
       
-      // Guardar token en localStorage y actualizar contexto de autenticación
-      login(data.data.user, data.data.token);
-      
-      // Redireccionar al dashboard (con un pequeño delay para asegurar que el estado se actualice)
-      setTimeout(() => {
+      // Iniciar sesión automáticamente con el token recibido
+      if (response.data && response.data.token && response.data.user) {
+        login(response.data.user, response.data.token);
+        
+        // Redireccionar al dashboard
         router.push('/dashboard');
-      }, 100);
-    } catch (err: unknown) {
+      }
+    } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Ocurrió un error durante el inicio de sesión');
+        setError('Ocurrió un error durante el registro');
       }
     } finally {
       setIsLoading(false);
@@ -63,9 +63,9 @@ const LoginForm = () => {
   return (
     <div className="bg-white p-8 border border-gray-300 rounded-lg shadow-sm max-w-md w-full">
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Iniciar sesión</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Crear cuenta</h1>
         <p className="text-gray-600 mt-2">
-          Accede a tu cuenta para verificar noticias de salud
+          Regístrate para verificar noticias de salud
         </p>
       </div>
 
@@ -76,6 +76,23 @@ const LoginForm = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+            Nombre completo
+          </label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            autoComplete="name"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Tu nombre"
+          />
+        </div>
+
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
             Correo electrónico
@@ -94,36 +111,52 @@ const LoginForm = () => {
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Contraseña
-            </label>
-            <a href="#" className="text-sm text-blue-600 hover:text-blue-500">
-              ¿Olvidaste tu contraseña?
-            </a>
-          </div>
+          <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+            Teléfono (opcional)
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="+52 123 456 7890"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            Contraseña
+          </label>
           <input
             id="password"
             name="password"
             type="password"
-            autoComplete="current-password"
+            autoComplete="new-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Al menos 6 caracteres"
           />
         </div>
 
-        <div className="flex items-center">
-          <input
-            id="remember-me"
-            name="remember-me"
-            type="checkbox"
-            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-            Recordarme
+        <div>
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+            Confirmar contraseña
           </label>
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
 
         <button
@@ -133,7 +166,7 @@ const LoginForm = () => {
             isLoading ? 'opacity-70 cursor-not-allowed' : ''
           }`}
         >
-          {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+          {isLoading ? 'Registrando...' : 'Registrarme'}
         </button>
       </form>
 
@@ -156,19 +189,19 @@ const LoginForm = () => {
             <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C8.303 2 4.588 4.949 3.616 9.216c-.916 3.993.501 8.17 3.593 10.663a9.958 9.958 0 005.336 1.554c6.076 0 10.86-5.415 9.65-11.751-.76-4.038-4.267-7.029-9.65-7.029z" />
             </svg>
-            Iniciar sesión con Google
+            Registrarme con Google
           </button>
         </div>
       </div>
 
       <p className="mt-8 text-center text-sm text-gray-600">
-        ¿No tienes una cuenta?{' '}
-        <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
-          Regístrate
+        ¿Ya tienes una cuenta?{' '}
+        <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+          Inicia sesión
         </Link>
       </p>
     </div>
   );
 };
 
-export default LoginForm;
+export default RegisterForm;
