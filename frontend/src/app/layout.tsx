@@ -4,6 +4,7 @@ import './globals.css';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { AuthProvider } from '@/context/AuthContext';
+import ChatButton from '@/components/chat/ChatButton';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -24,6 +25,7 @@ export default function RootLayout({
           <Navbar />
           <main className="flex-grow">{children}</main>
           <Footer />
+          <ChatButton />
         </AuthProvider>
       </body>
     </html>
