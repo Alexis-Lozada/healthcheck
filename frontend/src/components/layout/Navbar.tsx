@@ -3,23 +3,21 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import UserMenu from './UserMenu';
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   // Function to check if a link is active
   const isActive = (path: string) => pathname === path;
 
-  const handleLogout = async () => {
-    await logout();
-    setIsProfileDropdownOpen(false);
-  };
+  // Verificar si el usuario es administrador
+  const isAdmin = user && user.rol === 'admin';
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 shadow-sm z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo and Desktop Navigation */}
@@ -41,16 +39,26 @@ const Navbar = () => {
                 >
                   Inicio
                 </Link>
-                {user && (
+                <Link
+                  href="/news"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    pathname.startsWith('/news') 
+                      ? 'text-blue-600 bg-blue-50' 
+                      : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Noticias
+                </Link>
+                {isAdmin && (
                   <Link
-                    href="/dashboard"
+                    href="/admin/dashboard"
                     className={`px-3 py-2 rounded-md text-sm font-medium ${
-                      isActive('/dashboard') 
+                      pathname.startsWith('/admin') 
                         ? 'text-blue-600 bg-blue-50' 
                         : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
                     }`}
                   >
-                    Dashboard
+                    Admin
                   </Link>
                 )}
                 <Link
@@ -70,53 +78,7 @@ const Navbar = () => {
           {/* User menu or Login/Register buttons */}
           <div className="hidden sm:flex sm:items-center">
             {user ? (
-              <div className="ml-3 relative">
-                <div>
-                  <button
-                    type="button"
-                    className="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    id="user-menu"
-                    aria-expanded="false"
-                    aria-haspopup="true"
-                    onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                  >
-                    <span className="sr-only">Abrir menú de usuario</span>
-                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                      {user.nombre ? user.nombre.charAt(0).toUpperCase() : 'U'}
-                    </div>
-                  </button>
-                </div>
-                
-                {/* Dropdown menu */}
-                {isProfileDropdownOpen && (
-                  <div
-                    className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none"
-                    role="menu"
-                    aria-orientation="vertical"
-                    aria-labelledby="user-menu"
-                  >
-                    <div className="px-4 py-2 text-sm text-gray-700 border-b">
-                      <div className="font-medium">{user.nombre}</div>
-                      <div className="text-xs text-gray-500">{user.email}</div>
-                    </div>
-                    <Link
-                      href="/profile"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      role="menuitem"
-                      onClick={() => setIsProfileDropdownOpen(false)}
-                    >
-                      Mi perfil
-                    </Link>
-                    <button
-                      className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      role="menuitem"
-                      onClick={handleLogout}
-                    >
-                      Cerrar sesión
-                    </button>
-                  </div>
-                )}
-              </div>
+              <UserMenu />
             ) : (
               <>
                 <Link
@@ -170,7 +132,7 @@ const Navbar = () => {
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden">
+        <div className="sm:hidden bg-white">
           <div className="pt-2 pb-3 space-y-1">
             <Link
               href="/"
@@ -183,17 +145,28 @@ const Navbar = () => {
             >
               Inicio
             </Link>
-            {user && (
+            <Link
+              href="/news"
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                pathname.startsWith('/news') 
+                  ? 'text-blue-600 bg-blue-50' 
+                  : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Noticias
+            </Link>
+            {isAdmin && (
               <Link
-                href="/dashboard"
+                href="/admin/dashboard"
                 className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/dashboard') 
+                  pathname.startsWith('/admin') 
                     ? 'text-blue-600 bg-blue-50' 
                     : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                Dashboard
+                Admin
               </Link>
             )}
             <Link
@@ -210,36 +183,10 @@ const Navbar = () => {
             
             {/* User options for mobile */}
             {user ? (
-              <>
-                <div className="border-t border-gray-200 pt-4 pb-3">
-                  <div className="flex items-center px-4">
-                    <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                        {user.nombre ? user.nombre.charAt(0).toUpperCase() : 'U'}
-                      </div>
-                    </div>
-                    <div className="ml-3">
-                      <div className="text-base font-medium text-gray-800">{user.nombre}</div>
-                      <div className="text-sm font-medium text-gray-500">{user.email}</div>
-                    </div>
-                  </div>
-                  <div className="mt-3 space-y-1">
-                    <Link
-                      href="/profile"
-                      className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Mi perfil
-                    </Link>
-                    <button
-                      className="w-full text-left block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-                      onClick={handleLogout}
-                    >
-                      Cerrar sesión
-                    </button>
-                  </div>
-                </div>
-              </>
+              <UserMenu 
+                mobile={true} 
+                onMobileMenuClose={() => setIsMobileMenuOpen(false)} 
+              />
             ) : (
               <>
                 <Link

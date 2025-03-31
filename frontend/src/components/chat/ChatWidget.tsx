@@ -28,16 +28,23 @@ const ChatWidget = ({ onClose }: ChatWidgetProps) => {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
+  const [isExpanded, setIsExpanded] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Generar un ID de sesión único cuando se carga el componente
   useEffect(() => {
     // Usar el ID del usuario concatenado con un timestamp para crear un ID de sesión único
     const uniqueId = `${user?.id || 'guest'}_${Date.now()}`;
     setSessionId(uniqueId);
+    
+    // Enfocar el input cuando se monta el componente
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
   }, [user]);
 
-  // Scroll automático al último mensaje
+  // Scroll automático al último mensaje con animación suave
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -105,6 +112,10 @@ const ChatWidget = ({ onClose }: ChatWidgetProps) => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsTyping(false);
+      // Enfocar el input después de enviar el mensaje
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   };
 
@@ -112,105 +123,175 @@ const ChatWidget = ({ onClose }: ChatWidgetProps) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  return (
-    <div className="bg-white rounded-lg shadow-xl w-80 sm:w-96 flex flex-col overflow-hidden max-h-[600px] border border-gray-200">
-      {/* Cabecera */}
-      <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
-        <h3 className="font-medium">Asistente HealthCheck</h3>
-        <button
-          onClick={onClose}
-          className="text-white hover:text-gray-200"
-          aria-label="Cerrar chat"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      </div>
-
-      {/* Mensajes */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-800'
-              }`}
-            >
-              <div>{message.content}</div>
-              <div
-                className={`text-xs mt-1 ${
-                  message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
-                }`}
-              >
-                {formatTimestamp(message.timestamp)}
-              </div>
-            </div>
-          </div>
-        ))}
-        
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="bg-gray-200 text-gray-800 rounded-lg p-3 max-w-[80%]">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '600ms' }}></div>
-              </div>
+  // Función para renderizar las burbujas de chat con animación
+  const renderMessage = (message: Message, index: number) => {
+    const isUserMessage = message.role === 'user';
+    
+    return (
+      <div
+        key={index}
+        className={`flex ${isUserMessage ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+        style={{
+          animationDelay: `${index * 0.1}s`,
+        }}
+      >
+        {!isUserMessage && (
+          <div className="flex-shrink-0 mr-2">
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+              </svg>
             </div>
           </div>
         )}
         
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Formulario de entrada */}
-      <form onSubmit={handleSubmit} className="p-2 border-t border-gray-200">
-        <div className="flex items-center">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Escribe tu mensaje..."
-            disabled={isTyping}
-          />
-          <button
-            type="submit"
-            className={`px-4 py-2 bg-blue-600 text-white rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-              isTyping ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+        <div
+          className={`max-w-[75%] rounded-2xl px-4 py-3 mb-2 ${
+            isUserMessage
+              ? 'bg-blue-600 text-white rounded-tr-none'
+              : 'bg-gray-100 text-gray-800 rounded-tl-none'
+          }`}
+        >
+          <div className="text-sm">{message.content}</div>
+          <div
+            className={`text-xs mt-1 ${
+              isUserMessage ? 'text-blue-100' : 'text-gray-500'
             }`}
-            disabled={isTyping}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+            {formatTimestamp(message.timestamp)}
+          </div>
+        </div>
+        
+        {isUserMessage && (
+          <div className="flex-shrink-0 ml-2">
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+              <span className="text-sm text-gray-600">{user?.nombre?.charAt(0).toUpperCase() || 'U'}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div 
+      className={`fixed bottom-4 right-4 flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 transition-all duration-300 ease-in-out ${
+        isExpanded ? 'w-80 sm:w-96 h-[500px] max-h-[80vh]' : 'w-64 h-16'
+      }`}
+    >
+      {/* Cabecera */}
+      <div 
+        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-t-2xl flex justify-between items-center cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+              <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+            </svg>
+          </div>
+          <h3 className="font-medium text-sm">Asistente HealthCheck</h3>
+        </div>
+        <div className="flex items-center space-x-2">
+          {isExpanded && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="text-white/80 hover:text-white transition-colors p-1"
+              aria-label="Cerrar chat"
             >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z"
-                clipRule="evenodd"
-              />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            className="text-white/80 hover:text-white transition-colors p-1"
+            aria-label={isExpanded ? "Minimizar chat" : "Expandir chat"}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              {isExpanded ? (
+                <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+              ) : (
+                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+              )}
             </svg>
           </button>
         </div>
-      </form>
+      </div>
+
+      {/* Cuerpo del chat (solo visible cuando está expandido) */}
+      {isExpanded && (
+        <>
+          {/* Mensajes */}
+          <div className="flex-1 overflow-y-auto p-4 bg-white space-y-4 scrollbar-thin">
+            {messages.map((message, index) => renderMessage(message, index))}
+            
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="flex-shrink-0 mr-2">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                      <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="max-w-[75%] bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none px-4 py-3 mb-2">
+                  <div className="flex space-x-1 items-center h-5">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '600ms' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Formulario de entrada */}
+          <form onSubmit={handleSubmit} className="p-3 border-t border-gray-100 bg-white rounded-b-2xl">
+            <div className="flex items-center bg-gray-50 rounded-full border border-gray-200 overflow-hidden pl-4 pr-1 py-1">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400 outline-none"
+                placeholder="Escribe tu mensaje..."
+                disabled={isTyping}
+              />
+              <button
+                type="submit"
+                className={`w-8 h-8 flex items-center justify-center rounded-full ${
+                  input.trim() && !isTyping 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+                disabled={!input.trim() || isTyping}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Disclaimer o notas al pie */}
+            <div className="text-xs text-center text-gray-400 mt-2">
+              Este asistente está entrenado para proporcionar información sobre temas de salud
+            </div>
+          </form>
+        </>
+      )}
     </div>
   );
 };

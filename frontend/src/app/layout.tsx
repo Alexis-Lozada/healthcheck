@@ -23,7 +23,7 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen flex flex-col`}>
         <AuthProvider>
           <Navbar />
-          <main className="flex-grow">{children}</main>
+          <main className="flex-grow pt-16 bg-gray-50">{children}</main>
           <Footer />
           <ChatButton />
         </AuthProvider>
