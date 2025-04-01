@@ -1,213 +1,270 @@
-// src/app/news/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import SearchBar from '@/components/news/SearchBar';
+import NewsCard from '@/components/news/NewsCard';
+import { searchNews, getInteractionsForNews, createInteraction, enrichNewsWithPreviews } from '@/services/newsService';
+import type { NewsItem } from '@/types/news';
 import { useAuth } from '@/context/AuthContext';
 
-// Definimos la URL base de la API Gateway
-const API_URL = 'http://localhost:3003/api';
-
-interface NewsItem {
-  id: number;
-  titulo: string;
-  contenido: string;
-  url?: string;
-  fecha_publicacion?: string;
-  clasificaciones?: Array<{
-    resultado: 'verdadera' | 'falsa' | 'dudosa';
-    confianza: number;
-  }>;
-}
-
-interface NewsResponse {
-  status: string;
-  data: {
-    total: number;
-    currentPage: number;
-    totalPages: number;
-    news: NewsItem[];
-  };
-}
-
 export default function NewsPage() {
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalPages, setTotalPages] = useState(1);
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const query = searchParams.get('q') || '';
   const page = parseInt(searchParams.get('page') || '1');
+  const [searchResults, setSearchResults] = useState<NewsItem[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const { user } = useAuth();
 
+  // Cargar resultados de búsqueda cuando cambia la consulta o la página
   useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        setLoading(true);
-        
-        const response = await fetch(`${API_URL}/news?page=${page}&limit=12`);
-        
-        if (!response.ok) {
-          throw new Error('Error al cargar noticias');
-        }
-        
-        const data: NewsResponse = await response.json();
-        
-        if (data.status === 'success' && data.data) {
-          setNews(data.data.news);
-          setTotalPages(data.data.totalPages);
-        } else {
-          throw new Error('Formato de respuesta inesperado');
-        }
-      } catch (err) {
-        console.error('Error fetching news:', err);
-        setError(err instanceof Error ? err.message : 'Error desconocido');
-      } finally {
-        setLoading(false);
+    if (query) {
+      fetchSearchResults();
+    } else {
+      fetchRecentNews();
+    }
+  }, [query, page]);
+
+  // Buscar noticias
+  const fetchSearchResults = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const { news, totalPages: total } = await searchNews(query, page);
+      
+      // Enriquecer con previsualizaciones
+      let enrichedNews = await enrichNewsWithPreviews(news);
+      
+      // Si hay usuario, obtener interacciones
+      if (user) {
+        enrichedNews = await getInteractionsForNews(enrichedNews);
       }
-    };
-    
-    fetchNews();
-  }, [page]);
-
-  const getClassificationBadge = (newsItem: NewsItem) => {
-    if (!newsItem.clasificaciones || newsItem.clasificaciones.length === 0) {
-      return null;
+      
+      setSearchResults(enrichedNews);
+      setTotalPages(total);
+    } catch (err) {
+      console.error('Error fetching search results:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setLoading(false);
     }
-    
-    const classification = newsItem.clasificaciones[0];
-    
-    let badgeColor = 'bg-gray-100 text-gray-800';
-    if (classification.resultado === 'verdadera') {
-      badgeColor = 'bg-green-100 text-green-800';
-    } else if (classification.resultado === 'falsa') {
-      badgeColor = 'bg-red-100 text-red-800';
-    } else if (classification.resultado === 'dudosa') {
-      badgeColor = 'bg-yellow-100 text-yellow-800';
+  };
+
+  // Cargar noticias recientes si no hay consulta
+  const fetchRecentNews = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Simular llamada a API para obtener noticias recientes
+      const response = await fetch(`/api/news?page=${page}&limit=12`);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar noticias');
+      }
+      
+      const data = await response.json();
+      
+      if (data.status === 'success' && data.data) {
+        // Enriquecer con previsualizaciones
+        let enrichedNews = await enrichNewsWithPreviews(data.data.news);
+        
+        // Si hay usuario, obtener interacciones
+        if (user) {
+          enrichedNews = await getInteractionsForNews(enrichedNews);
+        }
+        
+        setSearchResults(enrichedNews);
+        setTotalPages(data.data.totalPages);
+      } else {
+        throw new Error('Formato de respuesta inesperado');
+      }
+    } catch (err) {
+      console.error('Error fetching news:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setLoading(false);
     }
-    
-    return (
-      <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${badgeColor}`}>
-        {classification.resultado.toUpperCase()}
-      </span>
-    );
   };
 
-  const truncateText = (text: string, maxLength: number = 150) => {
-    if (text.length <= maxLength) return text;
-    return text.substr(0, maxLength) + '...';
+  // Manejar nueva búsqueda
+  const handleSearch = (newQuery: string) => {
+    router.push(`/news?q=${encodeURIComponent(newQuery)}&page=1`);
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Fecha desconocida';
-    
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
+  // Manejar cambio de página
   const handlePageChange = (newPage: number) => {
-    router.push(`/news?page=${newPage}`);
+    const url = query
+      ? `/news?q=${encodeURIComponent(query)}&page=${newPage}`
+      : `/news?page=${newPage}`;
+    
+    router.push(url);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-              Noticias
-            </h1>
-            <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-              Explora noticias analizadas por nuestra plataforma
-            </p>
-          </div>
-          <div className="mt-10 flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-              Noticias
-            </h1>
-            <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-              Explora noticias analizadas por nuestra plataforma
-            </p>
-          </div>
-          <div className="mt-10 bg-red-50 p-4 rounded-md text-red-700 text-center">
-            <p>Error al cargar noticias: {error}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Manejar interacciones con noticias
+  const handleInteraction = async (newsId: number, interactionType: string) => {
+    if (!user) {
+      // Redirigir a login o mostrar mensaje
+      alert('Debes iniciar sesión para interactuar con noticias');
+      return;
+    }
+    
+    try {
+      // Crear interacción en el backend
+      await createInteraction(newsId, interactionType);
+      
+      // Actualizar el estado local para reflejar el cambio inmediatamente
+      setSearchResults(prevNews => 
+        prevNews.map(item => {
+          if (item.id === newsId) {
+            // Clonar el objeto de interacciones o crear uno nuevo
+            const userInteractions = { 
+              ...(item.userInteractions || {
+                marcar_confiable: false,
+                marcar_dudosa: false,
+                compartir: false
+              })
+            };
+            
+            // Actualizar según el tipo de interacción
+            if (interactionType === 'marcar_confiable') {
+              userInteractions.marcar_confiable = !userInteractions.marcar_confiable;
+              // Si marcamos como confiable, desmarcamos como dudosa
+              if (userInteractions.marcar_confiable) {
+                userInteractions.marcar_dudosa = false;
+              }
+            } else if (interactionType === 'marcar_dudosa') {
+              userInteractions.marcar_dudosa = !userInteractions.marcar_dudosa;
+              // Si marcamos como dudosa, desmarcamos como confiable
+              if (userInteractions.marcar_dudosa) {
+                userInteractions.marcar_confiable = false;
+              }
+            } else if (interactionType === 'compartir') {
+              userInteractions.compartir = true; // Compartir siempre es true
+            }
+            
+            return { ...item, userInteractions };
+          }
+          return item;
+        })
+      );
+    } catch (error) {
+      console.error('Error handling interaction:', error);
+      alert('Error al procesar tu interacción. Inténtalo de nuevo.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-            Noticias
+            {query ? `Resultados para "${query}"` : 'Todas las noticias'}
           </h1>
           <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-            Explora noticias analizadas por nuestra plataforma
+            {query 
+              ? `Explorando información verificada sobre "${query}"`
+              : 'Explora noticias analizadas y verificadas por nuestra plataforma'
+            }
           </p>
         </div>
-
-        {news.length === 0 ? (
-          <div className="mt-10 text-center text-gray-500">
-            No hay noticias disponibles en este momento.
-          </div>
-        ) : (
-          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {news.map((item) => (
-              <div key={item.id} className="flex flex-col rounded-lg shadow-lg overflow-hidden bg-white">
-                <div className="flex-1 p-6 flex flex-col justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      {getClassificationBadge(item)}
-                      <p className="text-sm text-gray-500">
-                        {formatDate(item.fecha_publicacion)}
-                      </p>
-                    </div>
-                    <Link href={`/news/${item.id}`}>
-                      <h3 className="text-xl font-semibold text-gray-900 hover:text-blue-600 transition-colors">
-                        {item.titulo}
-                      </h3>
-                    </Link>
-                    <p className="mt-3 text-base text-gray-500">
-                      {truncateText(item.contenido)}
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center">
-                    {item.url && (
-                      <a 
-                        href={item.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-sm font-medium text-blue-600 hover:text-blue-500"
-                      >
-                        Ver fuente original →
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        
+        {/* Barra de búsqueda */}
+        <div className="mt-8 max-w-3xl mx-auto">
+          <SearchBar 
+            onSearch={handleSearch} 
+            placeholder="Buscar por palabras clave..."
+            redirectToSearchPage={false}
+          />
+        </div>
+        
+        {/* Filtros */}
+        <div className="mt-6 max-w-3xl mx-auto flex flex-wrap justify-center gap-2">
+          <button 
+            className={`px-4 py-2 rounded-full text-sm font-medium ${
+              !query ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            }`}
+            onClick={() => router.push('/news')}
+          >
+            Todas
+          </button>
+          <button 
+            className={`px-4 py-2 rounded-full text-sm font-medium flex items-center ${
+              query === 'clasificacion:verdadera' 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            }`}
+            onClick={() => router.push('/news?q=clasificacion:verdadera&page=1')}
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Verificadas
+          </button>
+          <button 
+            className={`px-4 py-2 rounded-full text-sm font-medium flex items-center ${
+              query === 'clasificacion:falsa' 
+                ? 'bg-red-100 text-red-800' 
+                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            }`}
+            onClick={() => router.push('/news?q=clasificacion:falsa&page=1')}
+          >
+            <AlertTriangle className="h-4 w-4 mr-1" />
+            Falsas
+          </button>
+          <button 
+            className={`px-4 py-2 rounded-full text-sm font-medium flex items-center ${
+              query === 'clasificacion:dudosa' 
+                ? 'bg-yellow-100 text-yellow-800' 
+                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            }`}
+            onClick={() => router.push('/news?q=clasificacion:dudosa&page=1')}
+          >
+            <Info className="h-4 w-4 mr-1" />
+            Dudosas
+          </button>
+        </div>
+        
+        {/* Sección de resultados */}
+        <div className="mt-10">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 p-4 rounded-md text-red-700 text-center">
+              <p>Error: {error}</p>
+              <button
+                onClick={query ? fetchSearchResults : fetchRecentNews}
+                className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : searchResults.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-gray-600 text-lg">
+                No se encontraron resultados para tu búsqueda.
+              </p>
+              <p className="text-gray-500 mt-2">
+                Prueba con otros términos o filtros.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {searchResults.map((item) => (
+                <NewsCard
+                  key={item.id}
+                  news={item}
+                  onInteraction={handleInteraction}
+                />
+              ))}
+            </div>
+          )}
+        </div>
         
         {/* Paginación */}
         {totalPages > 1 && (
@@ -223,7 +280,7 @@ export default function NewsPage() {
                 }`}
               >
                 <span className="sr-only">Anterior</span>
-                ←
+                &larr;
               </button>
               
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
@@ -250,7 +307,7 @@ export default function NewsPage() {
                 }`}
               >
                 <span className="sr-only">Siguiente</span>
-                →
+                &rarr;
               </button>
             </nav>
           </div>

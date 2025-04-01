@@ -8,12 +8,15 @@ import Link from 'next/link';
 // Definimos la URL base de la API Gateway
 const API_URL = 'http://localhost:5000/api';
 
-const ScrapeGoogleNewsPage = () => {
+const ScrapeTwitterPage = () => {
   const { user, loading } = useAuth();
   const router = useRouter();
   
-  const [rssUrl, setRssUrl] = useState<string>('');
+  const [query, setQuery] = useState<string>('noticias salud covid vacunas');
   const [limit, setLimit] = useState<number>(10);
+  const [minLength, setMinLength] = useState<number>(100);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [saveToDB, setSaveToDB] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,7 @@ const ScrapeGoogleNewsPage = () => {
   // Redirigir si no está autenticado o no es admin
   useEffect(() => {
     if (!loading && (!user || user.rol !== 'admin')) {
-      router.push('/login');
+      router.push('/');
     }
   }, [loading, user, router]);
 
@@ -36,15 +39,18 @@ const ScrapeGoogleNewsPage = () => {
       setResult(null);
       setCsvUrl(null);
 
-      const response = await fetch(`${API_URL}/ml/classify/scrape/google`, {
+      const response = await fetch(`${API_URL}/ml/classify/scrape/twitter`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          rss_url: rssUrl || undefined,
+          query,
           limit,
+          min_length: minLength,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
           save_to_db: saveToDB,
         }),
       });
@@ -90,9 +96,9 @@ const ScrapeGoogleNewsPage = () => {
           <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Obtener Noticias de Google</h1>
+                <h1 className="text-xl font-semibold text-gray-900">Obtener Datos de Twitter</h1>
                 <p className="mt-1 text-sm text-gray-500">
-                  Configura el scraping de Google News para obtener noticias sobre temas de salud
+                  Configura el scraping de Twitter para obtener publicaciones sobre temas de salud
                 </p>
               </div>
               <Link
@@ -134,7 +140,7 @@ const ScrapeGoogleNewsPage = () => {
                       <div className="mt-2">
                         <a
                           href={csvUrl}
-                          download="google_news_results.csv"
+                          download="twitter_results.csv"
                           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
                         >
                           Descargar CSV
@@ -143,7 +149,7 @@ const ScrapeGoogleNewsPage = () => {
                     )}
                     {result.processed_ids && (
                       <p className="mt-2 text-sm text-green-700">
-                        Se procesaron {result.processed_ids.length} noticias y se guardaron en la base de datos.
+                        Se procesaron {result.processed_ids.length} tweets y se guardaron en la base de datos.
                       </p>
                     )}
                   </div>
@@ -153,44 +159,106 @@ const ScrapeGoogleNewsPage = () => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label htmlFor="rss-url" className="block text-sm font-medium text-gray-700">
-                  URL del RSS (opcional)
+                <label htmlFor="query" className="block text-sm font-medium text-gray-700">
+                  Términos de búsqueda
                 </label>
                 <div className="mt-1">
                   <input
-                    type="url"
-                    name="rss-url"
-                    id="rss-url"
-                    value={rssUrl}
-                    onChange={(e) => setRssUrl(e.target.value)}
-                    placeholder="https://news.google.com/rss/search?q=salud+OR+medicina&hl=es-419&gl=MX"
+                    type="text"
+                    name="query"
+                    id="query"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
                     className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
                   />
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  Si se deja vacío, se usará la URL predeterminada para noticias de salud.
+                  Ejemplo: "noticias salud covid vacunas". Usa OR para operador "O", - para excluir palabras.
                 </p>
               </div>
 
-              <div>
-                <label htmlFor="limit" className="block text-sm font-medium text-gray-700">
-                  Límite de noticias
-                </label>
-                <div className="mt-1">
-                  <input
-                    type="number"
-                    name="limit"
-                    id="limit"
-                    min="1"
-                    max="50"
-                    value={limit}
-                    onChange={(e) => setLimit(Number(e.target.value))}
-                    className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="start-date" className="block text-sm font-medium text-gray-700">
+                    Fecha de inicio
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="date"
+                      name="start-date"
+                      id="start-date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Ejemplo: 2025-01-01
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Número máximo de noticias a procesar (1-50).
-                </p>
+
+                <div>
+                  <label htmlFor="end-date" className="block text-sm font-medium text-gray-700">
+                    Fecha de fin
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="date"
+                      name="end-date"
+                      id="end-date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Ejemplo: 2025-03-31
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="limit" className="block text-sm font-medium text-gray-700">
+                    Límite de tweets
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="number"
+                      name="limit"
+                      id="limit"
+                      min="1"
+                      max="100"
+                      value={limit}
+                      onChange={(e) => setLimit(Number(e.target.value))}
+                      className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Número máximo de tweets a procesar (1-100)
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="min-length" className="block text-sm font-medium text-gray-700">
+                    Longitud mínima
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="number"
+                      name="min-length"
+                      id="min-length"
+                      min="10"
+                      max="280"
+                      value={minLength}
+                      onChange={(e) => setMinLength(Number(e.target.value))}
+                      className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Longitud mínima en caracteres para filtrar tweets cortos (recomendado: 100)
+                  </p>
+                </div>
               </div>
 
               <div className="flex items-start">
@@ -209,7 +277,7 @@ const ScrapeGoogleNewsPage = () => {
                     Guardar en la base de datos
                   </label>
                   <p className="text-gray-500">
-                    Si se marca, las noticias serán clasificadas y guardadas en la base de datos. Si no, se generará un CSV con los resultados.
+                    Si se marca, los tweets serán clasificados y guardados en la base de datos. Si no, se generará un CSV con los resultados.
                   </p>
                 </div>
               </div>
@@ -242,4 +310,4 @@ const ScrapeGoogleNewsPage = () => {
   );
 };
 
-export default ScrapeGoogleNewsPage;
+export default ScrapeTwitterPage;
