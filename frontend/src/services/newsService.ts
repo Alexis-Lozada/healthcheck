@@ -28,29 +28,66 @@ export const fetchRecentNews = async (limit: number = 6): Promise<NewsItem[]> =>
 };
 
 /**
- * Busca noticias con un query específico
+ * Busca noticias con múltiples filtros
  */
-export const searchNews = async (query: string, page: number = 1): Promise<{
+export const searchNews = async (
+  query?: string, 
+  clasificacion?: string, 
+  page: number = 1,
+  temaId?: number,
+  fechaInicio?: string,
+  fechaFin?: string,
+  fuenteId?: number
+): Promise<{
   news: NewsItem[];
   total: number;
   currentPage: number;
   totalPages: number;
 }> => {
   try {
-    const response = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}&page=${page}`);
+    // Construir URL base
+    let url = `${API_URL}/search?page=${page}&limit=12`;
+    
+    // Añadir parámetros opcionales
+    if (query) {
+      url += `&q=${encodeURIComponent(query)}`;
+    }
+    
+    if (clasificacion) {
+      url += `&clasificacion=${clasificacion}`;
+    }
+    
+    if (temaId) {
+      url += `&temaId=${temaId}`;
+    }
+    
+    if (fechaInicio) {
+      url += `&fechaInicio=${encodeURIComponent(fechaInicio)}`;
+    }
+    
+    if (fechaFin) {
+      url += `&fechaFin=${encodeURIComponent(fechaFin)}`;
+    }
+    
+    if (fuenteId) {
+      url += `&fuenteId=${fuenteId}`;
+    }
+    
+    const response = await fetch(url);
     
     if (!response.ok) {
-      throw new Error('Error al buscar noticias');
+      console.error('Error en respuesta:', response.status, response.statusText);
+      throw new Error(`Error al buscar noticias: ${response.status}`);
     }
     
     const data = await response.json();
     
     if (data.status === 'success' && data.data) {
       return {
-        news: data.data.results,
-        total: data.data.total,
-        currentPage: data.data.currentPage,
-        totalPages: data.data.totalPages
+        news: data.data.results || [],
+        total: data.data.total || 0,
+        currentPage: data.data.currentPage || 1,
+        totalPages: data.data.totalPages || 1
       };
     }
     
@@ -292,6 +329,50 @@ export const reportSource = async (fuenteId: number, motivo: string): Promise<{
     };
   } catch (error) {
     console.error('Error reporting source:', error);
+    throw error;
+  }
+};
+
+// Función adicional para obtener temas disponibles
+export const fetchTemas = async () => {
+  try {
+    const response = await fetch(`${API_URL}/temas`);
+    
+    if (!response.ok) {
+      throw new Error('Error al cargar temas');
+    }
+    
+    const data = await response.json();
+    
+    if (data.status === 'success' && data.data) {
+      return data.data;
+    }
+    
+    throw new Error('Formato de respuesta inesperado');
+  } catch (error) {
+    console.error('Error fetching temas:', error);
+    throw error;
+  }
+};
+
+// Función adicional para obtener fuentes disponibles
+export const fetchFuentes = async () => {
+  try {
+    const response = await fetch(`${API_URL}/fuentes`);
+    
+    if (!response.ok) {
+      throw new Error('Error al cargar fuentes');
+    }
+    
+    const data = await response.json();
+    
+    if (data.status === 'success' && data.data) {
+      return data.data;
+    }
+    
+    throw new Error('Formato de respuesta inesperado');
+  } catch (error) {
+    console.error('Error fetching fuentes:', error);
     throw error;
   }
 };

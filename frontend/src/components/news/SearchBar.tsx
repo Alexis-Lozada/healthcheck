@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 
 interface SearchBarProps {
@@ -15,8 +17,11 @@ const SearchBar = ({
   className = "",
   redirectToSearchPage = true
 }: SearchBarProps) => {
-  const [query, setQuery] = useState('');
+  const searchParams = useSearchParams();
   const router = useRouter();
+  
+  // Inicializar el estado con el query actual de los parámetros de búsqueda
+  const [query, setQuery] = useState(searchParams.get('q') || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +36,11 @@ const SearchBar = ({
       router.push(`/news?q=${encodeURIComponent(query)}`);
     }
   };
+
+  // Efecto para actualizar el query si cambia en los parámetros de búsqueda
+  useEffect(() => {
+    setQuery(searchParams.get('q') || '');
+  }, [searchParams]);
 
   return (
     <form onSubmit={handleSubmit} className={`w-full flex ${className}`}>

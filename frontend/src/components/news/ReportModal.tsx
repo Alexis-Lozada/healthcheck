@@ -24,7 +24,7 @@ const ReportModal = ({ fuente, onClose }: ReportModalProps) => {
     try {
       setIsSubmitting(true);
       
-      const response = await fetch('/api/reports', {
+      const response = await fetch('http://localhost:3003/api/reports', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
