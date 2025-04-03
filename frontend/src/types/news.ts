@@ -53,6 +53,10 @@ export interface ModelML {
       marcar_dudosa: boolean;
       compartir: boolean;
     };
+    interactionCounts?: {
+      likes: number;
+      dislikes: number;
+    };
   }
   
   export interface UserInteraction {

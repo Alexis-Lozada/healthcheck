@@ -15,15 +15,15 @@ const ReportModal = ({ fuente, onClose }: ReportModalProps) => {
   // Función para enviar reporte
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!reason.trim()) {
       setMessage({ type: 'error', text: 'Por favor, proporciona un motivo para el reporte' });
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
-      
+
       const response = await fetch('http://localhost:3003/api/reports', {
         method: 'POST',
         headers: {
@@ -35,25 +35,34 @@ const ReportModal = ({ fuente, onClose }: ReportModalProps) => {
           motivo: reason
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(data.message || 'Error al enviar reporte');
-      }
+        const mensaje = data.message || 'Error al enviar reporte';
       
+        // Si el mensaje dice que ya se reportó, no lo trates como error grave
+        if (mensaje.toLowerCase().includes('ya has reportado')) {
+          setMessage({ type: 'error', text: mensaje }); // O type: 'info' si querés otro color
+          return; // ← salimos sin tirar error
+        }
+      
+        // Si es otro tipo de error, sí lo lanzamos
+        throw new Error(mensaje);
+      }      
+
       setMessage({ type: 'success', text: 'Reporte enviado correctamente' });
-      
+
       // Cerrar modal automáticamente después de 2 segundos en caso de éxito
       setTimeout(() => {
         onClose();
       }, 2000);
-      
+
     } catch (error) {
       console.error('Error al enviar reporte:', error);
-      setMessage({ 
-        type: 'error', 
-        text: error instanceof Error ? error.message : 'Error al enviar reporte' 
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Error al enviar reporte'
       });
     } finally {
       setIsSubmitting(false);
@@ -61,7 +70,7 @@ const ReportModal = ({ fuente, onClose }: ReportModalProps) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }} className="fixed inset-0 flex items-center justify-center z-500">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Reportar fuente</h3>
@@ -72,7 +81,7 @@ const ReportModal = ({ fuente, onClose }: ReportModalProps) => {
             <X className="h-5 w-5" />
           </button>
         </div>
-        
+
         <div className="px-6 py-4">
           <div className="mb-4 p-3 bg-yellow-50 rounded-md flex">
             <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mr-3" />
@@ -81,17 +90,16 @@ const ReportModal = ({ fuente, onClose }: ReportModalProps) => {
               Este reporte será revisado por nuestro equipo.
             </div>
           </div>
-          
+
           {message && (
-            <div className={`mb-4 p-3 rounded-md text-sm ${
-              message.type === 'success' 
-                ? 'bg-green-50 text-green-700' 
+            <div className={`mb-4 p-3 rounded-md text-sm ${message.type === 'success'
+                ? 'bg-green-50 text-green-700'
                 : 'bg-red-50 text-red-700'
-            }`}>
+              }`}>
               {message.text}
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">
@@ -106,7 +114,7 @@ const ReportModal = ({ fuente, onClose }: ReportModalProps) => {
                 placeholder="Explica por qué consideras que esta fuente es poco confiable..."
               />
             </div>
-            
+
             <div className="flex justify-end space-x-3">
               <button
                 type="button"

@@ -376,3 +376,42 @@ export const fetchFuentes = async () => {
     throw error;
   }
 };
+
+export const getInteractionCounts = async (noticiaId: number): Promise<{
+  likes: number;
+  dislikes: number;
+  shares: number;
+}> => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    const response = await fetch(`${API_URL}/interactions/${noticiaId}/counts`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Error al obtener conteo de interacciones');
+    }
+    
+    const data = await response.json();
+    
+    if (data.status === 'success' && data.data) {
+      return {
+        likes: data.data.likes || 0,
+        dislikes: data.data.dislikes || 0,
+        shares: data.data.shares || 0
+      };
+    }
+    
+    throw new Error('Formato de respuesta inesperado');
+  } catch (error) {
+    console.error('Error fetching interaction counts:', error);
+    return { 
+      likes: 0, 
+      dislikes: 0, 
+      shares: 0 
+    };
+  }
+};
