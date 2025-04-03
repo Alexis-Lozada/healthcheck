@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import {
   AlertTriangle,
   CheckCircle,
@@ -25,12 +27,14 @@ interface NewsCardProps {
 }
 
 const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
+  const { user } = useAuth()
   const [showReportModal, setShowReportModal] = useState(false);
   const [interactionCounts, setInteractionCounts] = useState({
     likes: 0,
     dislikes: 0,
     shares: 0
   });
+  const router = useRouter();
 
   // Formatear fecha
   const formatDate = (dateString?: string) => {
@@ -131,8 +135,14 @@ const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
 
   // Manejar interacciones
   const handleInteraction = async (type: string) => {
+    if (!user) {
+      // Redirigir al usuario a la página de login
+      router.push('/login');
+      return;
+    }
+    
     await onInteraction(news.id, type);
-
+  
     // Actualizar conteos localmente después de la interacción
     try {
       const updatedCounts = await getInteractionCounts(news.id);
@@ -144,12 +154,19 @@ const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
 
   // Compartir noticia
   const handleShare = async () => {
+    // Verificar si el usuario está autenticado
+    if (!user) {
+      // Redirigir al usuario a la página de login
+      router.push('/login');
+      return; // Importante retornar para detener la ejecución
+    }
+  
     const shareUrl = `${window.location.origin}/news/${news.id}`;
     const shareText = `${news.titulo} - Verificado por HealthCheck`;
-
-    // Primero registrar la interacción de compartir
+  
+    // Registrar interacción de compartir
     await onInteraction(news.id, 'compartir');
-
+  
     // Actualizar conteos localmente
     try {
       const updatedCounts = await getInteractionCounts(news.id);
@@ -157,21 +174,7 @@ const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
     } catch (error) {
       console.error('Error actualizando conteos:', error);
     }
-
-    /* Intentar usar Web Share API (nativo en móviles y algunos navegadores)
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'HealthCheck - Noticia Verificada',
-          text: shareText,
-          url: shareUrl
-        });
-        return;
-      } catch (error) {
-        console.error('Error usando Web Share API:', error);
-      }
-    }*/
-
+  
     // Fallback: Compartir en Twitter
     const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
     window.open(twitterShareUrl, '_blank');

@@ -377,6 +377,7 @@ export const fetchFuentes = async () => {
   }
 };
 
+// Actualización para getInteractionCounts en newsService.ts
 export const getInteractionCounts = async (noticiaId: number): Promise<{
   likes: number;
   dislikes: number;
@@ -385,14 +386,27 @@ export const getInteractionCounts = async (noticiaId: number): Promise<{
   try {
     const token = localStorage.getItem('token');
     
+    // Si no hay token (usuario no logueado), hacer la solicitud sin autorización
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const response = await fetch(`${API_URL}/interactions/${noticiaId}/counts`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers
     });
     
+    // Si hay un error en la respuesta, devolver conteo vacío en lugar de lanzar error
     if (!response.ok) {
-      throw new Error('Error al obtener conteo de interacciones');
+      console.error('Error en respuesta de API:', response.status, response.statusText);
+      return { 
+        likes: 0, 
+        dislikes: 0, 
+        shares: 0 
+      };
     }
     
     const data = await response.json();
@@ -405,7 +419,11 @@ export const getInteractionCounts = async (noticiaId: number): Promise<{
       };
     }
     
-    throw new Error('Formato de respuesta inesperado');
+    return { 
+      likes: 0, 
+      dislikes: 0, 
+      shares: 0 
+    };
   } catch (error) {
     console.error('Error fetching interaction counts:', error);
     return { 

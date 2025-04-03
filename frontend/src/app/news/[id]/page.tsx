@@ -3,24 +3,24 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  ThumbsUp, 
-  ThumbsDown, 
-  Share2, 
-  AlertTriangle, 
-  CheckCircle, 
-  Info,
-  ExternalLink,
-  ChevronLeft,
-  Calendar,
-  Flag,
-  BarChart2
+import {
+    ThumbsUp,
+    ThumbsDown,
+    Share2,
+    AlertTriangle,
+    CheckCircle,
+    Info,
+    ExternalLink,
+    ChevronLeft,
+    Calendar,
+    Flag,
+    BarChart2
 } from 'lucide-react';
-import { 
-  getNewsById, 
-  createInteraction, 
-  getInteractionCounts,
-  getInteractionStatus
+import {
+    getNewsById,
+    createInteraction,
+    getInteractionCounts,
+    getInteractionStatus
 } from '@/services/newsService';
 import type { NewsItem } from '@/types/news';
 import ConfidenceBar from '@/components/news/ConfidenceBar';
@@ -55,7 +55,7 @@ export default function NewsDetailPage() {
         const fetchNewsDetails = async () => {
             try {
                 setLoading(true);
-                
+
                 // Obtener detalles de la noticia
                 const newsData = await getNewsById(Number(id));
                 setNews(newsData);
@@ -76,7 +76,7 @@ export default function NewsDetailPage() {
                 setLoading(false);
             }
         };
-        
+
         if (id) {
             fetchNewsDetails();
         }
@@ -84,13 +84,14 @@ export default function NewsDetailPage() {
 
     const handleInteraction = async (interactionType: 'marcar_confiable' | 'marcar_dudosa' | 'compartir') => {
         if (!user) {
-            alert('Debes iniciar sesión para interactuar');
+            // Redirigir a login
+            router.push('/login');
             return;
         }
 
         try {
             const result = await createInteraction(Number(id), interactionType);
-            
+
             // Actualizar conteos e interacciones
             const updatedCounts = await getInteractionCounts(Number(id));
             setInteractionCounts(updatedCounts);
@@ -104,14 +105,21 @@ export default function NewsDetailPage() {
         }
     };
 
+
     const handleShare = async () => {
+        if (!user) {
+            // Redirigir a login
+            router.push('/login');
+            return;
+        }
+
         const shareUrl = `${window.location.origin}/news/${id}`;
         const shareText = `${news?.titulo} - Verificado por HealthCheck`;
 
         // Registrar interacción de compartir
         await handleInteraction('compartir');
 
-        // Usar Web Share API si está disponible
+        // Compartir usando Web Share API o fallback
         if (navigator.share) {
             try {
                 await navigator.share({
@@ -134,7 +142,7 @@ export default function NewsDetailPage() {
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'Fecha desconocida';
-        
+
         const date = new Date(dateString);
         return date.toLocaleDateString('es-ES', {
             year: 'numeric',
@@ -151,12 +159,12 @@ export default function NewsDetailPage() {
                 </span>
             );
         }
-        
+
         const classification = news.clasificaciones[0];
-        
+
         let badgeColor = 'bg-gray-100 text-gray-800';
         let Icon = Info;
-        
+
         switch (classification.resultado) {
             case 'verdadera':
                 badgeColor = 'bg-green-100 text-green-800 border border-green-200';
@@ -171,7 +179,7 @@ export default function NewsDetailPage() {
                 Icon = Info;
                 break;
         }
-        
+
         return (
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${badgeColor} shadow-sm`}>
                 <Icon className="mr-1 h-3 w-3" />
@@ -179,11 +187,11 @@ export default function NewsDetailPage() {
             </span>
         );
     };
-    
+
     // Función para obtener color según nivel de confianza
     const getConfidenceColor = (confidence: number) => {
         const value = typeof confidence === 'string' ? parseFloat(confidence) : confidence;
-        
+
         if (value >= 0.7) return 'bg-green-500';
         if (value >= 0.4) return 'bg-yellow-500';
         return 'bg-red-500';
@@ -191,7 +199,7 @@ export default function NewsDetailPage() {
 
     // Referencia para el tweet embebido
     const tweetRef = useRef<HTMLDivElement>(null);
-    
+
     // Verificar si la URL es de Twitter
     const isTwitterUrl = (url?: string) => {
         if (!url) return false;
@@ -204,78 +212,78 @@ export default function NewsDetailPage() {
         if (!news || !news.url || !isTwitterUrl(news.url) || !showOriginal) {
             return;
         }
-        
+
         // No volver a cargar si ya está cargado y estamos en la misma noticia
         if (isTweetLoaded && tweetRef.current && tweetRef.current.querySelector('iframe')) {
             return;
         }
-        
+
         // Resetear estado de carga al cambiar de noticia
         setIsTweetLoaded(false);
-        
+
         const renderTweet = () => {
             if (!tweetRef.current) return;
-            
+
             // Siempre usar twitter.com en lugar de x.com para la incrustación
             let tweetUrl = news.url || '';
             if (tweetUrl.includes('x.com')) {
                 tweetUrl = tweetUrl.replace('x.com', 'twitter.com');
             }
-            
+
             // Eliminar Twitter widgets existentes para evitar duplicados
             const existingTweet = tweetRef.current.querySelector('.twitter-tweet');
             if (existingTweet && tweetRef.current.contains(existingTweet)) {
                 tweetRef.current.removeChild(existingTweet);
             }
-            
+
             // Crear el blockquote para Twitter
             const blockquote = document.createElement('blockquote');
             blockquote.className = 'twitter-tweet';
-            
+
             const link = document.createElement('a');
             link.href = tweetUrl;
             blockquote.appendChild(link);
-            
+
             tweetRef.current.appendChild(blockquote);
-            
+
             // Función para verificar si el tweet se ha cargado correctamente
             const checkIfLoaded = () => {
                 if (tweetRef.current && tweetRef.current.querySelector('iframe')) {
                     setIsTweetLoaded(true);
                 }
             };
-            
+
             // Cargar el widget de Twitter con un pequeño retraso para asegurar que DOM esté listo
             setTimeout(() => {
                 if ((window as any).twttr && (window as any).twttr.widgets) {
                     (window as any).twttr.widgets.load(tweetRef.current);
-                    
+
                     // Verificar la carga después de un tiempo
                     setTimeout(checkIfLoaded, 1000);
                 }
             }, 500);
         };
-        
+
         // Cargar el script de Twitter si aún no está cargado
         if (!(window as any).twttr) {
             const script = document.createElement('script');
             script.src = 'https://platform.twitter.com/widgets.js';
             script.async = true;
-            
+
             script.onload = () => {
                 renderTweet();
             };
-            
+
             document.body.appendChild(script);
         } else {
             renderTweet();
         }
-        
+
         // Reintentar la carga después de 1.5 segundos por si acaso
         const retryTimeout = setTimeout(() => {
             if (tweetRef.current && !tweetRef.current.querySelector('iframe')) {
                 renderTweet();
-                
+
                 // Verificar de nuevo después de otro segundo
                 setTimeout(() => {
                     if (tweetRef.current && tweetRef.current.querySelector('iframe')) {
@@ -284,7 +292,7 @@ export default function NewsDetailPage() {
                 }, 1000);
             }
         }, 2000);
-        
+
         return () => clearTimeout(retryTimeout);
     }, [news?.id, showOriginal, isTweetLoaded]);
 
@@ -292,7 +300,7 @@ export default function NewsDetailPage() {
     const handleIframeLoad = () => {
         setIsWebContentLoaded(true);
     };
-    
+
     // Renderizar el iframe adecuado según la URL
     const renderContentFrame = () => {
         if (!news || !news.url) {
@@ -334,7 +342,7 @@ export default function NewsDetailPage() {
                         </div>
                     </div>
                 )}
-                
+
                 <iframe
                     src={news.url}
                     className="w-full border-0 rounded-lg shadow-md"
@@ -415,16 +423,16 @@ export default function NewsDetailPage() {
                                     {getClassificationBadge()}
                                 </div>
                             </div>
-                            
+
                             <h1 className="text-2xl font-bold text-gray-900 leading-tight">{news.titulo}</h1>
-                            
+
                             {/* Fecha e información de la fuente */}
                             <div className="flex flex-wrap items-center justify-between text-sm text-gray-500">
                                 <div className="flex items-center mr-4 mb-2 sm:mb-0">
                                     <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                                     <span>{formatDate(news.fecha_publicacion)}</span>
                                 </div>
-                                
+
                                 {news.fuente && (
                                     <div className="flex items-center">
                                         <span className="font-medium mr-2">{news.fuente.nombre}</span>
@@ -438,7 +446,7 @@ export default function NewsDetailPage() {
                                     </div>
                                 )}
                             </div>
-                            
+
                             {/* Barra de confianza */}
                             {news.clasificaciones && news.clasificaciones.length > 0 && (
                                 <div className="mt-1">
@@ -450,13 +458,11 @@ export default function NewsDetailPage() {
                             <div className="flex flex-wrap mt-4 gap-1 md:gap-2">
                                 <button
                                     onClick={() => handleInteraction('marcar_confiable')}
-                                    className={`p-2 rounded-full transition-colors flex items-center ${
-                                        userInteractions.marcar_confiable
+                                    className={`p-2 rounded-full transition-colors flex items-center ${userInteractions.marcar_confiable
                                             ? 'text-white bg-green-500 hover:bg-green-600'
                                             : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
+                                        }`}
                                     title="Marcar como confiable"
-                                    disabled={!user}
                                 >
                                     <ThumbsUp className="h-5 w-5 mr-1" />
                                     <span>{interactionCounts.likes}</span>
@@ -464,13 +470,11 @@ export default function NewsDetailPage() {
 
                                 <button
                                     onClick={() => handleInteraction('marcar_dudosa')}
-                                    className={`p-2 rounded-full transition-colors flex items-center ${
-                                        userInteractions.marcar_dudosa
+                                    className={`p-2 rounded-full transition-colors flex items-center ${userInteractions.marcar_dudosa
                                             ? 'text-white bg-red-500 hover:bg-red-600'
                                             : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
+                                        }`}
                                     title="Marcar como dudosa"
-                                    disabled={!user}
                                 >
                                     <ThumbsDown className="h-5 w-5 mr-1" />
                                     <span>{interactionCounts.dislikes}</span>
@@ -504,21 +508,19 @@ export default function NewsDetailPage() {
                     {news.url && (
                         <div className="px-6 py-2 border-b border-t border-gray-100 flex">
                             <button
-                                className={`px-4 py-2 rounded-full mr-2 text-sm font-medium transition-colors ${
-                                    showOriginal 
-                                        ? 'bg-blue-500 text-white shadow-sm' 
+                                className={`px-4 py-2 rounded-full mr-2 text-sm font-medium transition-colors ${showOriginal
+                                        ? 'bg-blue-500 text-white shadow-sm'
                                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
+                                    }`}
                                 onClick={() => setShowOriginal(true)}
                             >
                                 Contenido original
                             </button>
                             <button
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                                    !showOriginal 
-                                        ? 'bg-blue-500 text-white shadow-sm' 
+                                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${!showOriginal
+                                        ? 'bg-blue-500 text-white shadow-sm'
                                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
+                                    }`}
                                 onClick={() => setShowOriginal(false)}
                             >
                                 Resumen y análisis
@@ -535,7 +537,7 @@ export default function NewsDetailPage() {
                                 {news.contenido.split('\n').map((paragraph, idx) => (
                                     paragraph ? <p key={idx} className="mb-4">{paragraph}</p> : <br key={idx} />
                                 ))}
-                                
+
                                 {/* Información del análisis */}
                                 {news.clasificaciones && news.clasificaciones.length > 0 && news.clasificaciones[0].explicacion && (
                                     <div className="mt-8 bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -558,16 +560,16 @@ export default function NewsDetailPage() {
                                 </h3>
                                 <div className="flex flex-col gap-2">
                                     <p className="text-blue-700 flex items-center text-sm">
-                                        <span className="font-medium min-w-[100px]">Nombre:</span> 
+                                        <span className="font-medium min-w-[100px]">Nombre:</span>
                                         {news.fuente.nombre}
                                     </p>
                                     {news.fuente.url && (
                                         <p className="text-blue-700 flex items-center text-sm">
-                                            <span className="font-medium min-w-[100px]">URL:</span> 
-                                            <a 
-                                                href={news.fuente.url} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer" 
+                                            <span className="font-medium min-w-[100px]">URL:</span>
+                                            <a
+                                                href={news.fuente.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
                                                 className="underline hover:text-blue-800 transition-colors overflow-hidden text-ellipsis"
                                             >
                                                 {news.fuente.url}
@@ -586,7 +588,7 @@ export default function NewsDetailPage() {
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* Información del modelo de ML */}
                         {news.clasificaciones && news.clasificaciones[0]?.modelo && !showOriginal && (
                             <div className="mt-4 bg-purple-50 p-4 rounded-lg shadow-sm">
@@ -628,7 +630,7 @@ export default function NewsDetailPage() {
                     )}
                 </div>
             </div>
-            
+
             {/* Modal para reportar fuente */}
             {reportModalOpen && news.fuente && (
                 <ReportModal

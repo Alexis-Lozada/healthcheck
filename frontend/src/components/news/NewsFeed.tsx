@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import SearchBar from './SearchBar';
 import NewsCard from './NewsCard';
@@ -31,6 +32,7 @@ const NewsFeed = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const router = useRouter();
 
   // Cargar noticias al iniciar
   useEffect(() => {
@@ -66,8 +68,8 @@ const NewsFeed = ({
   // Manejar interacciones con noticias
   const handleInteraction = async (newsId: number, interactionType: string) => {
     if (!user) {
-      // Redirigir a login o mostrar mensaje
-      alert('Debes iniciar sesión para interactuar con noticias');
+      // Redirigir a login en lugar de mostrar alerta
+      router.push('/login');
       return;
     }
     
