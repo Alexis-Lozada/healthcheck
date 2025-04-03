@@ -188,6 +188,18 @@ export default function NewsDetailPage() {
         );
     };
 
+    const handleReportClick = () => {
+        // Verificar si el usuario está autenticado
+        if (!user) {
+          // Redirigir al usuario a la página de login
+          router.push('/login');
+          return;
+        }
+        
+        // Si está autenticado, mostrar el modal de reporte
+        setReportModalOpen(true);
+      };
+
     // Función para obtener color según nivel de confianza
     const getConfidenceColor = (confidence: number) => {
         const value = typeof confidence === 'string' ? parseFloat(confidence) : confidence;
@@ -434,16 +446,13 @@ export default function NewsDetailPage() {
                                 </div>
 
                                 {news.fuente && (
-                                    <div className="flex items-center">
-                                        <span className="font-medium mr-2">{news.fuente.nombre}</span>
-                                        <button
-                                            onClick={() => setReportModalOpen(true)}
-                                            className="text-red-500 hover:text-red-700 transition-colors"
-                                            title="Reportar fuente"
-                                        >
-                                            <Flag className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={handleReportClick}
+                                        className="text-red-500 hover:text-red-700 transition-colors"
+                                        title="Reportar fuente"
+                                    >
+                                        <Flag className="h-4 w-4" />
+                                    </button>
                                 )}
                             </div>
 
@@ -459,8 +468,8 @@ export default function NewsDetailPage() {
                                 <button
                                     onClick={() => handleInteraction('marcar_confiable')}
                                     className={`p-2 rounded-full transition-colors flex items-center ${userInteractions.marcar_confiable
-                                            ? 'text-white bg-green-500 hover:bg-green-600'
-                                            : 'text-gray-600 hover:bg-gray-100'
+                                        ? 'text-white bg-green-500 hover:bg-green-600'
+                                        : 'text-gray-600 hover:bg-gray-100'
                                         }`}
                                     title="Marcar como confiable"
                                 >
@@ -471,8 +480,8 @@ export default function NewsDetailPage() {
                                 <button
                                     onClick={() => handleInteraction('marcar_dudosa')}
                                     className={`p-2 rounded-full transition-colors flex items-center ${userInteractions.marcar_dudosa
-                                            ? 'text-white bg-red-500 hover:bg-red-600'
-                                            : 'text-gray-600 hover:bg-gray-100'
+                                        ? 'text-white bg-red-500 hover:bg-red-600'
+                                        : 'text-gray-600 hover:bg-gray-100'
                                         }`}
                                     title="Marcar como dudosa"
                                 >
@@ -509,8 +518,8 @@ export default function NewsDetailPage() {
                         <div className="px-6 py-2 border-b border-t border-gray-100 flex">
                             <button
                                 className={`px-4 py-2 rounded-full mr-2 text-sm font-medium transition-colors ${showOriginal
-                                        ? 'bg-blue-500 text-white shadow-sm'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-blue-500 text-white shadow-sm'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
                                 onClick={() => setShowOriginal(true)}
                             >
@@ -518,8 +527,8 @@ export default function NewsDetailPage() {
                             </button>
                             <button
                                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${!showOriginal
-                                        ? 'bg-blue-500 text-white shadow-sm'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-blue-500 text-white shadow-sm'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
                                 onClick={() => setShowOriginal(false)}
                             >

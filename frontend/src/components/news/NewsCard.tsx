@@ -140,9 +140,9 @@ const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
       router.push('/login');
       return;
     }
-    
+
     await onInteraction(news.id, type);
-  
+
     // Actualizar conteos localmente después de la interacción
     try {
       const updatedCounts = await getInteractionCounts(news.id);
@@ -150,6 +150,18 @@ const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
     } catch (error) {
       console.error('Error actualizando conteos:', error);
     }
+  };
+
+  const handleReportClick = () => {
+    // Verificar si el usuario está autenticado
+    if (!user) {
+      // Redirigir al usuario a la página de login
+      router.push('/login');
+      return;
+    }
+    
+    // Si está autenticado, mostrar el modal de reporte
+    setShowReportModal(true);
   };
 
   // Compartir noticia
@@ -160,13 +172,13 @@ const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
       router.push('/login');
       return; // Importante retornar para detener la ejecución
     }
-  
+
     const shareUrl = `${window.location.origin}/news/${news.id}`;
     const shareText = `${news.titulo} - Verificado por HealthCheck`;
-  
+
     // Registrar interacción de compartir
     await onInteraction(news.id, 'compartir');
-  
+
     // Actualizar conteos localmente
     try {
       const updatedCounts = await getInteractionCounts(news.id);
@@ -174,7 +186,7 @@ const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
     } catch (error) {
       console.error('Error actualizando conteos:', error);
     }
-  
+
     // Fallback: Compartir en Twitter
     const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
     window.open(twitterShareUrl, '_blank');
@@ -285,7 +297,7 @@ const NewsCard = ({ news, onInteraction }: NewsCardProps) => {
                 <span>{news.fuente?.nombre || news.preview?.publisher || 'Fuente desconocida'}</span>
                 {news.fuente && (
                   <button
-                    onClick={() => setShowReportModal(true)}
+                    onClick={handleReportClick}
                     className="ml-2 text-red-500 hover:text-red-700 transition-colors"
                     title="Reportar fuente"
                   >
