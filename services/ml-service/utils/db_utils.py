@@ -196,9 +196,32 @@ def save_news_keywords(noticia_id, keywords):
         logger.error(f"Error al guardar palabras clave de la noticia: {str(e)}")
         raise
 
-def save_news(titulo, contenido, url, fecha_publicacion, fuente_id, tema_id=None):
-    """Guarda una noticia en la BD usando SQLAlchemy."""
+def find_existing_news_by_url(url):
+    """Busca si ya existe una noticia con la misma URL en la base de datos."""
+    if not url:
+        return None
+        
     try:
+        noticia = Noticia.query.filter_by(url=url).first()
+        return noticia
+    except SQLAlchemyError as e:
+        logger.error(f"Error al buscar noticia existente por URL: {str(e)}")
+        return None
+
+def save_news(titulo, contenido, url, fecha_publicacion, fuente_id, tema_id=None):
+    """
+    Guarda una noticia en la BD usando SQLAlchemy.
+    Si la URL ya existe en la base de datos, devuelve el ID de la noticia existente.
+    """
+    try:
+        # Si hay URL, verificar si ya existe la noticia
+        if url:
+            existing_news = find_existing_news_by_url(url)
+            if existing_news:
+                logger.info(f"Noticia con URL {url} ya existe en la BD con ID {existing_news.id}")
+                return existing_news.id
+        
+        # Si no existe, crear nueva noticia
         nueva_noticia = Noticia(
             titulo=titulo,
             contenido=contenido,
@@ -228,6 +251,27 @@ def get_active_model():
 def save_classification(noticia_id, modelo_id, resultado, confianza, explicacion):
     """Guarda la clasificación en la BD usando SQLAlchemy."""
     try:
+        # Verificar si ya existe una clasificación para esta noticia con este modelo
+        existing_classification = ClasificacionNoticia.query.filter_by(
+            noticia_id=noticia_id,
+            modelo_id=modelo_id
+        ).first()
+        
+        if existing_classification:
+            # Actualizar la clasificación existente si los valores son diferentes
+            if (existing_classification.resultado != resultado or 
+                float(existing_classification.confianza or 0) != float(confianza or 0) or
+                existing_classification.explicacion != explicacion):
+                
+                existing_classification.resultado = resultado
+                existing_classification.confianza = confianza
+                existing_classification.explicacion = explicacion
+                existing_classification.fecha_clasificacion = datetime.utcnow()
+                db.session.commit()
+                
+            return existing_classification.id
+        
+        # Si no existe, crear nueva clasificación
         nueva_clasificacion = ClasificacionNoticia(
             noticia_id=noticia_id,
             modelo_id=modelo_id,

@@ -13,7 +13,7 @@ import os
 from utils.db_utils import (
     get_or_create_source, save_news, get_active_model, 
     save_classification, classify_topic, extract_keywords, 
-    save_news_keywords
+    save_news_keywords, find_existing_news_by_url
 )
 from core.classify_service import predict_news
 
@@ -172,7 +172,7 @@ class TwitterScraper:
                 break
                 
             for tweet in tweets:
-                # Evitar procesar tweets ya vistos
+                # Extraer contenido del tweet
                 tweet_data = self._extract_tweet_content(tweet)
                 if not tweet_data or len(tweet_data["content"]) < min_length:
                     continue
@@ -180,6 +180,18 @@ class TwitterScraper:
                 tweets_processed += 1
                 
                 try:
+                    # Verificar si la noticia ya existe en la base de datos
+                    existing_news = find_existing_news_by_url(tweet_data["url"])
+                    if existing_news:
+                        logger.info(f"Tweet con URL {tweet_data['url']} ya existe en la BD con ID {existing_news.id}")
+                        processed_news_ids.append(existing_news.id)
+                        
+                        # Si hemos alcanzado el límite, salir
+                        if len(processed_news_ids) >= limit:
+                            break
+                            
+                        continue
+                    
                     # 1. Obtener o crear la fuente
                     fuente_id = get_or_create_source(tweet_data["url"])
                     

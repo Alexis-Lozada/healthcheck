@@ -9,7 +9,7 @@ from newspaper import Article
 from utils.db_utils import (
     get_or_create_source, save_news, get_active_model, 
     save_classification, classify_topic, extract_keywords, 
-    save_news_keywords
+    save_news_keywords, find_existing_news_by_url
 )
 from core.classify_service import predict_news
 from database.db import db
@@ -85,6 +85,13 @@ class GoogleNewsScraper:
                 real_url = self.get_actual_url(link_google)
                 
                 if not real_url:
+                    continue
+                
+                # Verificar si la noticia ya existe en la base de datos
+                existing_news = find_existing_news_by_url(real_url)
+                if existing_news:
+                    logger.info(f"Noticia con URL {real_url} ya existe en la BD con ID {existing_news.id}")
+                    processed_news_ids.append(existing_news.id)
                     continue
                 
                 # Extraer el contenido de la noticia

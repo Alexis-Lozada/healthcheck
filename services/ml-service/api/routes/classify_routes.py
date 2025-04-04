@@ -1,7 +1,11 @@
 from flask import Blueprint, request, jsonify, Response
 from core.classify_service import predict_news
 from utils.article_extractor import extract_news_data
-from utils.db_utils import get_or_create_source, save_news, get_active_model, save_classification, save_consultation, classify_topic, extract_keywords, save_news_keywords
+from utils.db_utils import (
+    get_or_create_source, save_news, get_active_model, 
+    save_classification, save_consultation, classify_topic, 
+    extract_keywords, save_news_keywords, find_existing_news_by_url
+)
 from scrapers.google_news import GoogleNewsScraper
 from scrapers.twitter_scraper import TwitterScraper
 import logging
@@ -28,8 +32,12 @@ def classify():
     try:
         usuario_id = data.get("usuario_id", None)  # Usuario opcional
         extracted_data = {}
+        existing_news = None
 
         if "url" in data:
+            # Verificar si la noticia ya existe en la base de datos
+            existing_news = find_existing_news_by_url(data["url"])
+            
             extracted_data = extract_news_data(data["url"])
             if not extracted_data:
                 return jsonify({"error": "No se pudo extraer contenido de la URL."}), 400
@@ -50,6 +58,50 @@ def classify():
         else:
             return jsonify({"error": "El JSON debe contener 'text' o 'url'."}), 400
 
+        # Si la noticia ya existe, solo registrar la consulta
+        if existing_news:
+            noticia_id = existing_news.id
+            logger.info(f"Noticia con URL {data.get('url')} ya existe en la BD con ID {noticia_id}")
+            
+            # Obtener la clasificación existente (asumimos que ya tiene una)
+            clasificacion = existing_news.clasificaciones[0] if existing_news.clasificaciones else None
+            
+            if clasificacion:
+                resultado = clasificacion.resultado
+                confianza = float(clasificacion.confianza) if clasificacion.confianza is not None else 0
+                explicacion = clasificacion.explicacion
+                clasificacion_id = clasificacion.id
+            else:
+                # Si no hay clasificación, clasificar ahora
+                resultado, confianza, explicacion = predict_news(text)
+                modelo_id = get_active_model()
+                clasificacion_id = save_classification(noticia_id, modelo_id, resultado, confianza, explicacion)
+            
+            # Obtener tema si existe
+            tema_nombre = existing_news.tema.nombre if existing_news.tema else "Sin clasificar"
+            
+            # Registrar consulta del usuario
+            consulta_id = None
+            if usuario_id:
+                consulta_id = save_consultation(usuario_id, noticia_id)
+                
+            # Extraer palabras clave del contenido para devolver en la respuesta
+            keywords = extract_keywords(text)
+            
+            return jsonify({
+                "Consulta ID": consulta_id,
+                "Noticia ID": noticia_id,
+                "Clasificación ID": clasificacion_id,
+                "Fuente": data.get("url", "Texto ingresado directamente"),
+                **extracted_data,
+                "Clasificación": resultado,
+                "Confianza": confianza,
+                "Explicación": explicacion,
+                "Tema": tema_nombre,
+                "Palabras Clave": keywords,
+                "Mensaje": "Noticia encontrada en la base de datos"
+            }), 200
+            
         # PASO 1: Clasificar el Tema dinámicamente
         tema_nombre, tema_id = classify_topic(text)
         
@@ -93,7 +145,8 @@ def classify():
             "Confianza": confianza,
             "Explicación": explicacion,
             "Tema": tema_nombre,
-            "Palabras Clave": keywords
+            "Palabras Clave": keywords,
+            "Mensaje": "Nueva noticia procesada y almacenada"
         }), 200
     
     except Exception as e:
