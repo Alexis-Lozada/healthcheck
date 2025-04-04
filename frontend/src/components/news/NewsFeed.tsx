@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import SearchBar from './SearchBar';
 import NewsCard from './NewsCard';
+import NewsCardSkeleton from './NewsCardSkeleton';
 import { 
   fetchRecentNews, 
   enrichNewsWithPreviews, 
@@ -118,22 +119,12 @@ const NewsFeed = ({
     }
   };
 
-  // Si está cargando, mostrar spinner
-  if (loading) {
-    return (
-      <div className="py-12 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">{title}</h2>
-            <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500">{subtitle}</p>
-          </div>
-          <div className="mt-10 flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Renderizar esqueletos durante la carga
+  const renderSkeletons = () => {
+    return Array(limit).fill(0).map((_, index) => (
+      <NewsCardSkeleton key={`skeleton-${index}`} />
+    ));
+  };
 
   // Si hay error, mostrar mensaje
   if (error) {
@@ -174,19 +165,22 @@ const NewsFeed = ({
         )}
 
         {/* Grid de noticias */}
-        {news.length === 0 ? (
+        {news.length === 0 && !loading ? (
           <div className="mt-10 text-center text-gray-500">
             No hay noticias disponibles en este momento.
           </div>
         ) : (
           <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {news.map((item) => (
-              <NewsCard
-                key={item.id}
-                news={item}
-                onInteraction={handleInteraction}
-              />
-            ))}
+            {loading 
+              ? renderSkeletons() 
+              : news.map((item) => (
+                  <NewsCard
+                    key={item.id}
+                    news={item}
+                    onInteraction={handleInteraction}
+                  />
+                ))
+            }
           </div>
         )}
       </div>

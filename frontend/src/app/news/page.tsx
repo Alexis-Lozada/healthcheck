@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, CheckCircle, Info, Filter } from 'lucide-react';
+import { AlertTriangle, Filter } from 'lucide-react';
 import SearchBar from '@/components/news/SearchBar';
 import NewsCard from '@/components/news/NewsCard';
+import NewsCardSkeleton from '@/components/news/NewsCardSkeleton';
 import { 
   searchNews, 
   getInteractionsForNews, 
@@ -24,7 +25,7 @@ export default function NewsPage() {
   // Estado para parámetros de búsqueda
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [clasificacion, setClasificacion] = useState(searchParams.get('clasificacion') || '');
-  const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'));
+  const [page, setPage] = useState(1);
   const [temaId, setTemaId] = useState<number | null>(searchParams.get('temaId') ? parseInt(searchParams.get('temaId')!) : null);
   const [fuenteId, setFuenteId] = useState<number | null>(searchParams.get('fuenteId') ? parseInt(searchParams.get('fuenteId')!) : null);
   const [fechaInicio, setFechaInicio] = useState(searchParams.get('fechaInicio') || '');
@@ -37,11 +38,35 @@ export default function NewsPage() {
   // Estados de la página
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Estado para mostrar/ocultar filtros
   const [showFilters, setShowFilters] = useState(false);
+
+  // Observer para el scroll infinito
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastNewsElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading) return;
+    
+    if (observer.current) observer.current.disconnect();
+    
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !loading) {
+        // Pequeño retraso para evitar múltiples activaciones
+        setTimeout(() => {
+          setPage(prevPage => prevPage + 1);
+        }, 100);
+      }
+    }, { 
+      rootMargin: '0px 0px 200px 0px', // Cargar un poco antes de llegar al final
+      threshold: 0.1 // Reducido para activarse más temprano
+    });
+    
+    if (node) observer.current.observe(node);
+  }, [loading, hasMore]);
 
   // Cargar temas y fuentes al inicio
   useEffect(() => {
@@ -60,6 +85,23 @@ export default function NewsPage() {
 
     loadFilters();
   }, []);
+
+  // Actualizar URL con parámetros de búsqueda sin recargar la página
+  useEffect(() => {
+    if (!initialLoad) {
+      const params = new URLSearchParams();
+      
+      if (query) params.set('q', query);
+      if (clasificacion) params.set('clasificacion', clasificacion);
+      if (temaId) params.set('temaId', temaId.toString());
+      if (fuenteId) params.set('fuenteId', fuenteId.toString());
+      if (fechaInicio) params.set('fechaInicio', fechaInicio);
+      if (fechaFin) params.set('fechaFin', fechaFin);
+      
+      const newUrl = `/news${params.toString() ? `?${params.toString()}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [query, clasificacion, temaId, fuenteId, fechaInicio, fechaFin, initialLoad]);
 
   // Cargar noticias cuando cambian los parámetros
   useEffect(() => {
@@ -86,8 +128,24 @@ export default function NewsPage() {
           enrichedNews = await getInteractionsForNews(enrichedNews);
         }
         
-        setNewsItems(enrichedNews);
+        // Si es la primera página, reemplazar; sino, agregar evitando duplicados
+        if (page === 1) {
+          setNewsItems(enrichedNews);
+        } else {
+          setNewsItems(prevItems => {
+            // Obtener IDs de elementos existentes
+            const existingIds = new Set(prevItems.map(item => item.id));
+            
+            // Filtrar elementos nuevos para evitar duplicados
+            const uniqueNewItems = enrichedNews.filter(item => !existingIds.has(item.id));
+            
+            return [...prevItems, ...uniqueNewItems];
+          });
+        }
+        
         setTotalPages(result.totalPages);
+        setHasMore(page < result.totalPages);
+        setInitialLoad(false);
       } catch (err) {
         console.error('Error loading news:', err);
         setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -101,21 +159,12 @@ export default function NewsPage() {
 
   // Aplicar filtros
   const applyFilters = () => {
-    const params = new URLSearchParams();
+    // Resetear a la primera página y vaciar los items actuales
+    setPage(1);
+    setNewsItems([]);
+    setHasMore(true);
     
-    // Añadir parámetros solo si tienen valor
-    if (query) params.set('q', query);
-    if (clasificacion) params.set('clasificacion', clasificacion);
-    if (temaId) params.set('temaId', temaId.toString());
-    if (fuenteId) params.set('fuenteId', fuenteId.toString());
-    if (fechaInicio) params.set('fechaInicio', fechaInicio);
-    if (fechaFin) params.set('fechaFin', fechaFin);
-    
-    // Siempre reiniciar a la primera página
-    params.set('page', '1');
-    
-    // Navegar con los nuevos parámetros
-    router.push(`/news?${params.toString()}`);
+    // El useEffect detectará los cambios en los filtros y cargará las noticias
   };
 
   // Manejar cambios en los filtros
@@ -175,6 +224,20 @@ export default function NewsPage() {
     }
   };
 
+  // Renderizar esqueletos para carga inicial
+  const renderInitialSkeletons = () => {
+    return Array(12).fill(0).map((_, index) => (
+      <NewsCardSkeleton key={`skeleton-${index}`} />
+    ));
+  };
+
+  // Renderizar esqueletos para carga adicional (al final de la lista)
+  const renderLoadMoreSkeletons = () => {
+    return Array(3).fill(0).map((_, index) => (
+      <NewsCardSkeleton key={`skeleton-loadmore-${index}`} />
+    ));
+  };
+
   // Renderizar componente
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -192,9 +255,13 @@ export default function NewsPage() {
         <div className="mt-8 max-w-3xl mx-auto">
           <SearchBar 
             onSearch={(newQuery) => {
-              setQuery(newQuery);
-              // Resetear página y otros filtros si es necesario
-              setPage(1);
+              if (newQuery !== query) {
+                setQuery(newQuery);
+                // Resetear página y limpiar noticias actuales
+                setPage(1);
+                setNewsItems([]);
+                setHasMore(true);
+              }
             }}
             placeholder="Buscar por palabras clave..."
             redirectToSearchPage={false}
@@ -275,8 +342,9 @@ export default function NewsPage() {
               <button 
                 onClick={applyFilters}
                 className="col-span-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+                disabled={loading}
               >
-                Aplicar Filtros
+                {loading ? 'Cargando...' : 'Aplicar Filtros'}
               </button>
             </div>
           )}
@@ -284,83 +352,75 @@ export default function NewsPage() {
         
         {/* Sección de resultados */}
         <div className="mt-10">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
-          ) : error ? (
+          {error ? (
             <div className="bg-red-50 p-4 rounded-md text-red-700 text-center">
               <p>Error: {error}</p>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  setPage(1);
+                  setNewsItems([]);
+                  setHasMore(true);
+                }}
                 className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
               >
                 Reintentar
               </button>
             </div>
-          ) : newsItems.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-gray-600 text-lg">
-                No se encontraron resultados para tu búsqueda.
-              </p>
-              <p className="text-gray-500 mt-2">
-                Prueba con otros términos o filtros.
-              </p>
-            </div>
           ) : (
             <>
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {newsItems.map((item) => (
-                  <NewsCard
-                    key={item.id}
-                    news={item}
-                    onInteraction={handleInteraction}
-                  />
-                ))}
+                {/* Mostrar mensajes de carga inicial o sin resultados */}
+                {initialLoad && newsItems.length === 0 ? (
+                  renderInitialSkeletons()
+                ) : newsItems.length === 0 && !loading ? (
+                  <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg">
+                    <p className="text-gray-600 text-lg">
+                      No se encontraron resultados para tu búsqueda.
+                    </p>
+                    <p className="text-gray-500 mt-2">
+                      Prueba con otros términos o filtros.
+                    </p>
+                  </div>
+                ) : (
+                  // Mostrar resultados
+                  newsItems.map((item, index) => {
+                    // Crear una key única combinando el ID y el índice
+                    const uniqueKey = `news-${item.id}-${index}`;
+                    
+                    // Si es el último elemento, añadir la referencia para el observador
+                    if (index === newsItems.length - 1) {
+                      return (
+                        <div key={uniqueKey} ref={lastNewsElementRef}>
+                          <NewsCard
+                            news={item}
+                            onInteraction={handleInteraction}
+                          />
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <NewsCard
+                          key={uniqueKey}
+                          news={item}
+                          onInteraction={handleInteraction}
+                        />
+                      );
+                    }
+                  })
+                )}
+                
+                {/* Mostrar indicador de carga al cargar más elementos */}
+                {loading && !initialLoad && hasMore && (
+                  <>
+                    {renderLoadMoreSkeletons()}
+                  </>
+                )}
               </div>
-
-              {/* Paginación */}
-              {totalPages > 1 && (
-                <div className="mt-10 flex justify-center">
-                  <nav className="inline-flex shadow-sm -space-x-px" aria-label="Paginación">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                        page === 1 
-                          ? 'text-gray-300 cursor-not-allowed' 
-                          : 'text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      Anterior
-                    </button>
-                    
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setPage(pageNum)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          pageNum === page
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    ))}
-                    
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                        page === totalPages 
-                          ? 'text-gray-300 cursor-not-allowed' 
-                          : 'text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      Siguiente
-                    </button>
-                  </nav>
+              
+              {/* Mensaje cuando no hay más resultados */}
+              {!loading && !hasMore && newsItems.length > 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No hay más resultados para mostrar</p>
                 </div>
               )}
             </>
