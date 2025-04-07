@@ -1,9 +1,10 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function GoogleCallback() {
+function GoogleCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -24,25 +25,26 @@ export default function GoogleCallback() {
 
     // Guardar token en localStorage
     localStorage.setItem('token', token);
-    
-    // Intentar decodificar el token para obtener información básica del usuario
+
     try {
       // Nota: esto es una decodificación simple del JWT para obtener los datos del payload
       // No es una verificación criptográfica completa, eso se hace en el backend
       const base64Url = token.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const payload = JSON.parse(window.atob(base64));
-      
-      localStorage.setItem('user', JSON.stringify({
-        id: payload.id,
-        email: payload.email,
-        rol: payload.rol,
-      }));
+
+      localStorage.setItem(
+        'user',
+        JSON.stringify({
+          id: payload.id,
+          email: payload.email,
+          rol: payload.rol,
+        })
+      );
     } catch (err) {
       console.error('Error decodificando token:', err);
     }
-    
-    // Redireccionar al dashboard
+
     router.push('/');
   }, [router, searchParams]);
 
@@ -81,5 +83,13 @@ export default function GoogleCallback() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function GoogleCallback() {
+  return (
+    <Suspense fallback={<div className="text-center mt-10">Cargando...</div>}>
+      <GoogleCallbackInner />
+    </Suspense>
   );
 }
