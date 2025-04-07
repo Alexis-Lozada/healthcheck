@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Filter } from 'lucide-react';
@@ -17,7 +18,7 @@ import {
 import type { NewsItem } from '@/types/news';
 import { useAuth } from '@/context/AuthContext';
 
-export default function NewsPage() {
+function NewsPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
@@ -428,5 +429,13 @@ export default function NewsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NewsPage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-10">Cargando noticias...</div>}>
+      <NewsPageInner />
+    </Suspense>
   );
 }
