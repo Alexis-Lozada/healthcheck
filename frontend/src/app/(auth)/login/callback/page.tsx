@@ -43,7 +43,7 @@ export default function GoogleCallback() {
     }
     
     // Redireccionar al dashboard
-    router.push('/dashboard');
+    router.push('/');
   }, [router, searchParams]);
 
   if (error) {

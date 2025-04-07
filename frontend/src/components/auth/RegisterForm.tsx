@@ -42,7 +42,7 @@ const RegisterForm = () => {
         login(response.data.user, response.data.token);
         
         // Redireccionar al dashboard
-        router.push('/dashboard');
+        router.push('/');
       }
     } catch (err) {
       if (err instanceof Error) {

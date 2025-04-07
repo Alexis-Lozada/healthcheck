@@ -42,7 +42,7 @@ const LoginForm = () => {
       
       // Redireccionar al dashboard (con un pequeño delay para asegurar que el estado se actualice)
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push('/');
       }, 100);
     } catch (err: unknown) {
       if (err instanceof Error) {
