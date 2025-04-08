@@ -45,7 +45,7 @@ function GoogleCallbackInner() {
       console.error('Error decodificando token:', err);
     }
 
-    router.push('/');
+    window.location.href = '/' // Evitar problemas de recarga
   }, [router, searchParams]);
 
   if (error) {
