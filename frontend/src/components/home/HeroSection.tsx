@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 const HeroSection = () => {
   return (
-    <section className="relative isolate overflow-hidden py-16 sm:py-24">
+    <section className="relative isolate py-16 sm:py-24 mb-20">
       <div className="mx-auto max-w-4xl px-6 lg:px-8 text-center">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl mb-6 text-center">
           Plataforma IA para verificar <br />
