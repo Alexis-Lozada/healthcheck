@@ -26,7 +26,8 @@ export interface UserPreferences {
   }
   
   // URL base de la API
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004/api';
+  // const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004/api';
+  const API_URL = 'https://notifications.healthcheck.news/api';
   
   // Endpoints
   const ENDPOINTS = {
