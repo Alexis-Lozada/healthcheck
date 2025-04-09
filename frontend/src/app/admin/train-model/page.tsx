@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 
 // Definimos la URL base de la API Gateway
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://ml.healthcheck.news/api';
 
 const TrainModelPage = () => {
   const { user, loading } = useAuth();
