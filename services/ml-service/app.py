@@ -10,7 +10,7 @@ from flask_cors import CORS
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "https://healthcheck.news"}})
+CORS(app)
 
 # Cargar configuración desde `Config`
 app.config.from_object(Config)
