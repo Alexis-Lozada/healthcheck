@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 
 // Definimos la URL base de la API Gateway
 // const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-const API_URL = 'https://ml.healthcheck.news/api/ml/classify/predict';
+const API_URL = 'https://ml.healthcheck.news/api/ml/chatbot/chat';
 
 interface Message {
   role: 'user' | 'bot';
