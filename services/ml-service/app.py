@@ -10,7 +10,10 @@ from flask_cors import CORS
 
 
 app = Flask(__name__)
-CORS(app)
+from flask_cors import CORS
+
+# Configura CORS solo para healthcheck.news
+CORS(app, resources={r"/api/*": {"origins": "https://healthcheck.news"}})
 
 # Cargar configuración desde `Config`
 app.config.from_object(Config)
