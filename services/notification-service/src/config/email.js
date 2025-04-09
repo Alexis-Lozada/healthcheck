@@ -1,25 +1,17 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-// Configuración del cliente de correo electrónico con Hostinger
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_SECURE, // true para el puerto 465, false para otros puertos
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+// Configurar API key de SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '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');
 
 // Configuración común para los emails
 const emailDefaults = {
   from: {
     name: 'HealthCheck',
-    address: process.env.EMAIL_USER || 'notifications@healthcheck.news'
+    email: process.env.EMAIL_FROM || 'notifications@healthcheck.news'
   }
 };
 
 module.exports = {
-  transporter,
+  sendGrid: sgMail,
   emailDefaults
 };

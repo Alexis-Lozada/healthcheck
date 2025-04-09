@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors'); 
-const { emailConfig } = require('./config');
 const routes = require('./routes');
 const schedulerService = require('./services/scheduler.service');
 const logger = require('./utils/logger');
@@ -17,15 +16,6 @@ app.use(cors({
 }));
 
 app.use(express.json());
-
-// Verificar la conexión con el servidor de correo al iniciar
-emailConfig.transporter.verify(function(error, success) {
-  if (error) {
-    logger.error('Error al conectar con el servidor de correo:', error);
-  } else {
-    logger.info('Servidor de correo listo para enviar mensajes');
-  }
-});
 
 // Registrar rutas
 app.use('/api', routes);

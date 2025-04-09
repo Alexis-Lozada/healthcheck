@@ -3,7 +3,7 @@ const { emailConfig } = require('../../config');
 const logger = require('../../utils/logger');
 
 /**
- * Implementación de notificación por email
+ * Implementación de notificación por email usando SendGrid
  */
 class EmailNotifier extends NotificationInterface {
   /**
@@ -17,17 +17,20 @@ class EmailNotifier extends NotificationInterface {
       const { email, nombre } = recipient;
       const { titulo, mensaje } = content;
       
-      const mailOptions = {
-        ...emailConfig.emailDefaults,
+      const msg = {
         to: email,
+        from: {
+          email: emailConfig.emailDefaults.from.email,
+          name: emailConfig.emailDefaults.from.name
+        },
         subject: titulo,
         html: this._generateIndividualEmailTemplate(nombre, titulo, mensaje)
       };
       
-      await emailConfig.transporter.sendMail(mailOptions);
+      await emailConfig.sendGrid.send(msg);
       return true;
     } catch (error) {
-      logger.error('Error al enviar email:', error);
+      logger.error('Error al enviar email con SendGrid:', error);
       return false;
     }
   }
@@ -70,14 +73,17 @@ class EmailNotifier extends NotificationInterface {
       for (const email in emailGroups) {
         const { nombre, notifications } = emailGroups[email];
         
-        const mailOptions = {
-          ...emailConfig.emailDefaults,
+        const msg = {
           to: email,
+          from: {
+            email: emailConfig.emailDefaults.from.email,
+            name: emailConfig.emailDefaults.from.name
+          },
           subject: `HealthCheck: Alertas de desinformación (${notifications.length})`,
           html: this._generateBulkEmailTemplate(nombre, notifications)
         };
         
-        await emailConfig.transporter.sendMail(mailOptions);
+        await emailConfig.sendGrid.send(msg);
         
         // Recopilar IDs de notificaciones enviadas
         notifications.forEach(n => sentNotificationIds.push(n.id));
@@ -85,7 +91,7 @@ class EmailNotifier extends NotificationInterface {
       
       return sentNotificationIds;
     } catch (error) {
-      logger.error('Error al enviar emails agrupados:', error);
+      logger.error('Error al enviar emails agrupados con SendGrid:', error);
       return [];
     }
   }

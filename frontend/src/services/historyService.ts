@@ -2,7 +2,7 @@
 import { NewsItem } from '@/types/news';
 
 //const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003/api';
-const API_URL = 'http://localhost:3003/api';
+const API_URL = 'https://news.healthcheck.news/api';
 
 export interface HistoryEntry {
   id: number;
