@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, request, jsonify
 from core.classify_service import predict_news
 from utils.article_extractor import extract_news_data
 from utils.db_utils import (
@@ -6,293 +6,239 @@ from utils.db_utils import (
     save_classification, save_consultation, classify_topic, 
     extract_keywords, save_news_keywords, find_existing_news_by_url
 )
-from scrapers.google_news import GoogleNewsScraper
-from scrapers.twitter_scraper import TwitterScraper
-import logging
-from datetime import datetime
-import csv
-import io
 import os
+import requests
+import logging
 
-# Configuración básica de logging
+# Basic logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Crear el Blueprint
+# Google Search API configuration
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_CX = os.getenv("GOOGLE_CX")
+
+# Create Blueprint
 classify_bp = Blueprint("classify_bp", __name__)
+
+def search_related_news(query, limit=5):
+    """Search for related news using Google Search API."""
+    if not GOOGLE_API_KEY or not GOOGLE_CX:
+        logger.warning("Google Search API credentials not configured")
+        return []
+    
+    # Domains to exclude (non-news sites)
+    excluded_domains = [
+        'youtube.com', 'youtu.be', 'facebook.com', 'instagram.com', 
+        'twitter.com', 'x.com', 'tiktok.com', 'linkedin.com',
+        'reddit.com', 'pinterest.com', 'wikipedia.org'
+    ]
+    
+    try:
+        url = "https://www.googleapis.com/customsearch/v1"
+        params = {
+            "q": f"{query} noticias",
+            "key": GOOGLE_API_KEY,
+            "cx": GOOGLE_CX,
+            "num": limit + 5,  # Request more to account for filtered results
+            "lr": "lang_es",   # Restrict to Spanish language results
+            "gl": "mx"         # Geographic location: Mexico (for Spanish content priority)
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get("items", [])
+            
+            related_news = []
+            processed_count = 0
+            
+            for item in items:
+                if processed_count >= limit:
+                    break
+                    
+                news_url = item.get("link", "")
+                title = item.get("title", "")
+                snippet = item.get("snippet", "")
+                
+                # Check if URL is from excluded domain
+                is_excluded = any(domain in news_url.lower() for domain in excluded_domains)
+                if is_excluded:
+                    logger.debug(f"Skipping excluded domain: {news_url}")
+                    continue
+                
+                # Try to classify each related news
+                classification = "unknown"
+                confidence = 0
+                
+                try:
+                    # Try to extract and classify the article
+                    extracted_data = extract_news_data(news_url)
+                    if extracted_data and extracted_data.get("Texto Completo"):
+                        result, conf, _ = predict_news(extracted_data["Texto Completo"])
+                        classification = result
+                        confidence = conf
+                except Exception as e:
+                    logger.debug(f"Could not classify related news {news_url}: {str(e)}")
+                
+                related_news.append({
+                    "title": title,
+                    "snippet": snippet,
+                    "url": news_url,
+                    "classification": classification,
+                    "confidence": confidence
+                })
+                
+                processed_count += 1
+            
+            return related_news
+        else:
+            logger.error(f"Google Search API error: {response.status_code}")
+            return []
+            
+    except Exception as e:
+        logger.error(f"Error searching related news: {str(e)}")
+        return []
 
 @classify_bp.route("/predict", methods=["POST"])
 def classify():
-    """Recibe una noticia (texto o URL), la guarda en la base de datos y la clasifica."""
+    """Receives news (text or URL), saves it to database and classifies it."""
     data = request.json
 
     if not data:
-        return jsonify({"error": "Por favor, envía un JSON con 'text' o 'url'"}), 400
+        return jsonify({"error": "Please send JSON with 'text' or 'url'"}), 400
 
     try:
-        usuario_id = data.get("usuario_id", None)  # Usuario opcional
+        user_id = data.get("user_id", None)  # Optional user
         extracted_data = {}
         existing_news = None
 
         if "url" in data:
-            # Verificar si la noticia ya existe en la base de datos
+            # Check if news already exists in database
             existing_news = find_existing_news_by_url(data["url"])
             
             extracted_data = extract_news_data(data["url"])
             if not extracted_data:
-                return jsonify({"error": "No se pudo extraer contenido de la URL."}), 400
+                return jsonify({"error": "Could not extract content from URL."}), 400
 
-            # Guardar fuente
-            fuente_id = get_or_create_source(data["url"])
+            # Save source
+            source_id = get_or_create_source(data["url"])
             text = extracted_data["Texto Completo"]
 
         elif "text" in data:
             text = data["text"]
             extracted_data = {
-                "Título": "No disponible",
+                "Título": "Not available",
                 "Texto Completo": text,
-                "Autor": "Desconocido",
+                "Autor": "Unknown",
                 "Fecha de Publicación": None
             }
-            fuente_id = None
+            source_id = None
         else:
-            return jsonify({"error": "El JSON debe contener 'text' o 'url'."}), 400
+            return jsonify({"error": "JSON must contain 'text' or 'url'."}), 400
 
-        # Si la noticia ya existe, solo registrar la consulta
+        # If news already exists, only register consultation
         if existing_news:
-            noticia_id = existing_news.id
-            logger.info(f"Noticia con URL {data.get('url')} ya existe en la BD con ID {noticia_id}")
+            news_id = existing_news.id
+            logger.info(f"News with URL {data.get('url')} already exists in DB with ID {news_id}")
             
-            # Obtener la clasificación existente (asumimos que ya tiene una)
-            clasificacion = existing_news.clasificaciones[0] if existing_news.clasificaciones else None
+            # Get existing classification (assume it already has one)
+            classification = existing_news.clasificaciones[0] if existing_news.clasificaciones else None
             
-            if clasificacion:
-                resultado = clasificacion.resultado
-                confianza = float(clasificacion.confianza) if clasificacion.confianza is not None else 0
-                explicacion = clasificacion.explicacion
-                clasificacion_id = clasificacion.id
+            if classification:
+                result = classification.resultado
+                confidence = float(classification.confianza) if classification.confianza is not None else 0
+                explanation = classification.explicacion
+                classification_id = classification.id
             else:
-                # Si no hay clasificación, clasificar ahora
-                resultado, confianza, explicacion = predict_news(text)
-                modelo_id = get_active_model()
-                clasificacion_id = save_classification(noticia_id, modelo_id, resultado, confianza, explicacion)
+                # If no classification exists, classify now
+                result, confidence, explanation = predict_news(text)
+                model_id = get_active_model()
+                classification_id = save_classification(news_id, model_id, result, confidence, explanation)
             
-            # Obtener tema si existe
-            tema_nombre = existing_news.tema.nombre if existing_news.tema else "Sin clasificar"
+            # Get topic if exists
+            topic_name = existing_news.tema.nombre if existing_news.tema else "Unclassified"
             
-            # Registrar consulta del usuario
-            consulta_id = None
-            if usuario_id:
-                consulta_id = save_consultation(usuario_id, noticia_id)
+            # Register user consultation
+            consultation_id = None
+            if user_id:
+                consultation_id = save_consultation(user_id, news_id)
                 
-            # Extraer palabras clave del contenido para devolver en la respuesta
+            # Extract keywords from content for response
             keywords = extract_keywords(text)
             
+            # Search for related news
+            search_query = " ".join(keywords[:3]) if keywords else extracted_data.get("Título", "")
+            related_news = search_related_news(search_query)
+            
             return jsonify({
-                "Consulta ID": consulta_id,
-                "Noticia ID": noticia_id,
-                "Clasificación ID": clasificacion_id,
-                "Fuente": data.get("url", "Texto ingresado directamente"),
+                "consultation_id": consultation_id,
+                "news_id": news_id,
+                "classification_id": classification_id,
+                "source": data.get("url", "Direct text input"),
                 **extracted_data,
-                "Clasificación": resultado,
-                "Confianza": confianza,
-                "Explicación": explicacion,
-                "Tema": tema_nombre,
-                "Palabras Clave": keywords,
-                "Mensaje": "Noticia encontrada en la base de datos"
+                "classification": result,
+                "confidence": confidence,
+                "explanation": explanation,
+                "topic": topic_name,
+                "keywords": keywords,
+                "related_news": related_news,
+                "message": "News found in database"
             }), 200
             
-        # PASO 1: Clasificar el Tema dinámicamente
-        tema_nombre, tema_id = classify_topic(text)
+        # STEP 1: Classify topic dynamically
+        topic_name, topic_id = classify_topic(text)
         
-        # PASO 2: Guardar Noticia con su Tema
-        noticia_id = save_news(
+        # STEP 2: Save news with topic
+        news_id = save_news(
             extracted_data["Título"],
             extracted_data["Texto Completo"],
             data.get("url"),
             extracted_data["Fecha de Publicación"],
-            fuente_id,
-            tema_id
+            source_id,
+            topic_id
         )
         
-        # PASO 3: Extraer y Guardar Keywords
+        # STEP 3: Extract and save keywords
         keywords = extract_keywords(text)
-        save_news_keywords(noticia_id, keywords)
+        save_news_keywords(news_id, keywords)
 
-        # PASO 4: Clasificar Noticia como verdadera o falsa
-        resultado, confianza, explicacion = predict_news(text)
+        # STEP 4: Classify news as true or false
+        result, confidence, explanation = predict_news(text)
 
-        # Obtener el modelo activo
-        modelo_id = get_active_model()
-        if not modelo_id:
-            return jsonify({"error": "No hay un modelo activo disponible para la clasificación."}), 500
+        # Get active model
+        model_id = get_active_model()
+        if not model_id:
+            return jsonify({"error": "No active model available for classification."}), 500
 
-        # Guardar clasificación
-        clasificacion_id = save_classification(noticia_id, modelo_id, resultado, confianza, explicacion)
+        # Save classification
+        classification_id = save_classification(news_id, model_id, result, confidence, explanation)
 
-        # PASO 5: Guardar en historial de consultas
-        consulta_id = None
-        if usuario_id:
-            consulta_id = save_consultation(usuario_id, noticia_id)
+        # STEP 5: Save in consultation history
+        consultation_id = None
+        if user_id:
+            consultation_id = save_consultation(user_id, news_id)
+
+        # STEP 6: Search for related news
+        search_query = " ".join(keywords[:3]) if keywords else extracted_data.get("Título", "")
+        related_news = search_related_news(search_query)
 
         return jsonify({
-            "Consulta ID": consulta_id,
-            "Noticia ID": noticia_id,
-            "Clasificación ID": clasificacion_id,
-            "Fuente": data.get("url", "Texto ingresado directamente"),
+            "consultation_id": consultation_id,
+            "news_id": news_id,
+            "classification_id": classification_id,
+            "source": data.get("url", "Direct text input"),
             **extracted_data,
-            "Clasificación": resultado,
-            "Confianza": confianza,
-            "Explicación": explicacion,
-            "Tema": tema_nombre,
-            "Palabras Clave": keywords,
-            "Mensaje": "Nueva noticia procesada y almacenada"
+            "classification": result,
+            "confidence": confidence,
+            "explanation": explanation,
+            "topic": topic_name,
+            "keywords": keywords,
+            "related_news": related_news,
+            "message": "New news processed and stored"
         }), 200
     
     except Exception as e:
-        logger.error(f"Error durante la clasificación: {str(e)}")
-        return jsonify({"error": f"Error durante el procesamiento: {str(e)}"}), 500
-
-@classify_bp.route("/scrape/google", methods=["POST"])
-def scrape_google_news():
-    """Inicia el scraping de noticias desde Google News y devuelve un CSV con los resultados."""
-    try:
-        data = request.json or {}
-        
-        # Obtener parámetros
-        rss_url = data.get("rss_url")  # Si es None, usará la URL predeterminada
-        limit = data.get("limit", 5)    # Número de noticias a procesar, por defecto 5
-        save_to_db = data.get("save_to_db", False)  # Por defecto no guardar en BD
-        
-        # Iniciar el scraper
-        scraper = GoogleNewsScraper()
-        
-        # Lista para resultados
-        results = []
-        
-        # Si se debe guardar en BD, usar el método original
-        if save_to_db:
-            processed_news_ids = scraper.scrape_news(rss_url, limit)
-            return jsonify({
-                "status": "success",
-                "message": f"Se procesaron {len(processed_news_ids)} noticias de Google News correctamente.",
-                "processed_ids": processed_news_ids
-            }), 200
-        else:
-            # Si no se guarda en BD, obtenemos los resultados sin guardar
-            results = scraper.get_news_without_saving(rss_url, limit)
-            
-            # Crear un CSV en memoria
-            output = io.StringIO()
-            fieldnames = [
-                "titulo", "url", "fecha_publicacion", "fuente", 
-                "contenido", "tema", "clasificacion", "confianza", 
-                "palabras_clave"
-            ]
-            
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-            for item in results:
-                writer.writerow({
-                    "titulo": item.get("titulo", ""),
-                    "url": item.get("url", ""),
-                    "fecha_publicacion": item.get("fecha_publicacion", ""),
-                    "fuente": item.get("fuente", ""),
-                    "contenido": item.get("contenido", "")[:500] + "...",  # Truncar para que no sea muy grande
-                    "tema": item.get("tema", ""),
-                    "clasificacion": item.get("clasificacion", ""),
-                    "confianza": item.get("confianza", ""),
-                    "palabras_clave": ", ".join(item.get("palabras_clave", []))
-                })
-            
-            # Crear respuesta CSV
-            output.seek(0)
-            return Response(
-                output.getvalue(),
-                mimetype="text/csv",
-                headers={"Content-Disposition": "attachment;filename=google_news_results.csv"}
-            )
-        
-    except Exception as e:
-        logger.error(f"Error durante el scraping de Google News: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error durante el scraping de Google News: {str(e)}"
-        }), 500
-
-@classify_bp.route("/scrape/twitter", methods=["POST"])
-def scrape_twitter():
-    """Inicia el scraping de tweets y devuelve un CSV con los resultados."""
-    try:
-        data = request.json or {}
-        
-        # Obtener parámetros
-        query = data.get("query", "noticias salud mexico enfermedad hospital -toro")
-        start_date = data.get("start_date")
-        end_date = data.get("end_date")
-        limit = data.get("limit", 10)
-        min_length = data.get("min_length", 50)
-        save_to_db = data.get("save_to_db", False)  # Por defecto no guardar en BD
-        
-        # Iniciar el scraper
-        scraper = TwitterScraper()
-        
-        # Si se debe guardar en BD, usar el método original
-        if save_to_db:
-            processed_news_ids = scraper.scrape_tweets(
-                query=query,
-                start_date=start_date,
-                end_date=end_date,
-                limit=limit,
-                min_length=min_length
-            )
-            return jsonify({
-                "status": "success",
-                "message": f"Se procesaron {len(processed_news_ids)} tweets correctamente.",
-                "processed_ids": processed_news_ids
-            }), 200
-        else:
-            # Si no se guarda en BD, obtenemos los resultados sin guardar
-            results = scraper.get_tweets_without_saving(
-                query=query,
-                start_date=start_date,
-                end_date=end_date,
-                limit=limit,
-                min_length=min_length
-            )
-            
-            # Crear un CSV en memoria
-            output = io.StringIO()
-            fieldnames = [
-                "autor", "fecha", "url", "contenido", "tema", 
-                "clasificacion", "confianza", "palabras_clave"
-            ]
-            
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-            for item in results:
-                writer.writerow({
-                    "autor": item.get("autor", ""),
-                    "fecha": item.get("fecha", ""),
-                    "url": item.get("url", ""),
-                    "contenido": item.get("contenido", ""),
-                    "tema": item.get("tema", ""),
-                    "clasificacion": item.get("clasificacion", ""),
-                    "confianza": item.get("confianza", ""),
-                    "palabras_clave": ", ".join(item.get("palabras_clave", []))
-                })
-            
-            # Crear respuesta CSV
-            output.seek(0)
-            return Response(
-                output.getvalue(),
-                mimetype="text/csv",
-                headers={"Content-Disposition": "attachment;filename=twitter_results.csv"}
-            )
-        
-    except Exception as e:
-        logger.error(f"Error durante el scraping de Twitter: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error durante el scraping de Twitter: {str(e)}"
-        }), 500
+        logger.error(f"Error during classification: {str(e)}")
+        return jsonify({"error": f"Error during processing: {str(e)}"}), 500

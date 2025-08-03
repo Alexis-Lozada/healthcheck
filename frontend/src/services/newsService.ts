@@ -1,6 +1,6 @@
 import { NewsItem, UserInteraction } from '@/types/news';
 
-const API_URL = 'https://news.healthcheck.news/api';
+const API_URL = 'http://localhost:3003/api';
 const MICROLINK_API = 'https://api.microlink.io';
 
 /**
