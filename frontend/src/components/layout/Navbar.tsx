@@ -61,6 +61,14 @@ const Navbar = () => {
             >
               Noticias
             </Link>
+            <Link
+              href="/analytics"
+              className={`text-sm font-medium ${
+                pathname.startsWith('/analytics') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
+              }`}
+            >
+              Analíticas
+            </Link>
             {isAdmin && (
               <Link
                 href="/admin/dashboard"
@@ -147,6 +155,15 @@ const Navbar = () => {
               }`}
             >
               Noticias
+            </Link>
+            <Link
+              href="/analytics"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block text-base font-medium ${
+                pathname.startsWith('/analytics') ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
+              }`}
+            >
+              Analíticas
             </Link>
             {isAdmin && (
               <Link

@@ -18,16 +18,17 @@ const HeroSection = () => {
 
         <Link
           href="/login"
-          className="inline-flex items-center justify-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium text-base shadow-md hover:from-blue-600 hover:to-indigo-600 transition duration-300 z-10"
+          className="relative inline-flex items-center justify-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium text-base shadow-md overflow-hidden group transition duration-300 hover:shadow-lg z-10"
         >
           <Image
             src="/assets/logo-mobile-white.png"
             alt="Icono de acceso"
             width={20}
             height={20}
-            className="w-5 h-5"
+            className="w-5 h-5 relative z-10"
           />
-          Comenzar ahora
+          <span className="relative z-10">Comenzar ahora</span>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
         </Link>
       </div>
 

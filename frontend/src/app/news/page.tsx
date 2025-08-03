@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Filter } from 'lucide-react';
-import SearchBar from '@/components/news/SearchBar';
+import SearchBar from '@/components/common/SearchBar';
 import NewsCard from '@/components/news/NewsCard';
 import NewsCardSkeleton from '@/components/news/NewsCardSkeleton';
 import { 

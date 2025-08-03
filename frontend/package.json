@@ -11,10 +11,13 @@
   "dependencies": {
     "@react-three/drei": "^10.0.5",
     "@react-three/fiber": "^9.1.1",
+    "@types/highcharts": "^5.0.44",
     "axios": "^1.8.4",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "framer-motion": "^12.6.2",
+    "highcharts": "^12.3.0",
+    "highcharts-react-official": "^3.2.2",
     "lucide-react": "^0.484.0",
     "next": "15.2.3",
     "react": "^19.0.0",

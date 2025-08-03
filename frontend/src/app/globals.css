@@ -59,3 +59,13 @@ body {
 .animate-slow-spin {
   animation: slow-spin 10s linear infinite;
 }
+
+/* En tu archivo CSS global */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE y Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari y Opera */
+}
