@@ -18,19 +18,34 @@ const NetworkGraph = ({ data }) => {
       const Highcharts = (await import('highcharts')).default;
       const networkgraph = await import('highcharts/modules/networkgraph');
       const exporting = await import('highcharts/modules/exporting');
-      const accessibility = await import('highcharts/modules/accessibility');
-      const adaptive = await import('highcharts/themes/adaptive');
 
       applyModule(networkgraph, Highcharts);
       applyModule(exporting, Highcharts);
-      applyModule(accessibility, Highcharts);
-      applyModule(adaptive, Highcharts);
+
+      // Paleta de colores morados que complementa el azul del sitio
+      const purpleColors = [
+        '#8B5CF6', // Violeta principal
+        '#A855F7', // Púrpura brillante
+        '#9333EA', // Violeta intenso
+        '#7C3AED', // Violeta profundo
+        '#6D28D9', // Púrpura oscuro
+        '#5B21B6', // Violeta muy oscuro
+        '#DDD6FE', // Violeta claro
+        '#C4B5FD', // Lavanda
+        '#B794F6', // Púrpura suave
+        '#AD85EE'  // Violeta medio
+      ];
+
+      // Sobrescribir los colores por defecto de Highcharts
+      Highcharts.setOptions({
+        colors: purpleColors
+      });
 
       Highcharts.addEvent(
         Highcharts.Series,
         'afterSetOptions',
         function (e) {
-          const colors = Highcharts.getOptions().colors;
+          const colors = purpleColors;
           const nodes = {};
           let i = 0;
 
@@ -42,12 +57,15 @@ const NetworkGraph = ({ data }) => {
               if (link[0] === 'Noticias Falsas en Tendencia') {
                 nodes['Noticias Falsas en Tendencia'] = {
                   id: 'Noticias Falsas en Tendencia',
-                  marker: { radius: 20 }
+                  marker: { 
+                    radius: 20,
+                    fillColor: '#4F46E5' // Azul índigo que combina con el sitio
+                  }
                 };
                 nodes[link[1]] = {
                   id: link[1],
                   marker: { radius: 12 },
-                  color: colors[i++]
+                  color: colors[i++ % colors.length]
                 };
               } else if (nodes[link[0]] && nodes[link[0]].color) {
                 nodes[link[1]] = {
@@ -76,7 +94,9 @@ const NetworkGraph = ({ data }) => {
             keys: ['from', 'to'],
             link: {
               dashStyle: 'Dash',
-              lineWidth: 1
+              lineWidth: 1,
+              color: '#A855F7', // Color morado para las conexiones
+              opacity: 0.6
             },
             layoutAlgorithm: {
               enableSimulation: true,
@@ -92,7 +112,9 @@ const NetworkGraph = ({ data }) => {
             linkFormat: '',
             style: {
               fontSize: '0.8em',
-              fontWeight: 'normal'
+              fontWeight: 'normal',
+              color: '#374151', // Gris oscuro para mejor legibilidad
+              textOutline: '1px contrast'
             }
           },
           id: 'fake-news',
@@ -126,6 +148,8 @@ const NetworkGraph = ({ data }) => {
           max-width: 800px;
           margin: 1em auto;
         }
+
+
       `}</style>
       <figure className="highcharts-figure">
         <div id="container" style={{ height: '600px' }}></div>
