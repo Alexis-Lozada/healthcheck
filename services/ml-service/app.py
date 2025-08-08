@@ -2,6 +2,7 @@ from flask import Flask
 from api.routes.classify_routes import classify_bp
 from api.routes.train_routes import train_bp
 from api.routes.chatbot_routes import chatbot_bp
+from api.routes.analytics_routes import analytics_bp
 from database.db import db, init_db
 from database.models import *  # Importar todos los modelos
 from config import Config
@@ -22,6 +23,7 @@ init_db(app)
 app.register_blueprint(classify_bp, url_prefix="/api/ml/classify")
 app.register_blueprint(train_bp, url_prefix="/api/ml/train")
 app.register_blueprint(chatbot_bp, url_prefix="/api/ml/chatbot")
+app.register_blueprint(analytics_bp, url_prefix="/api/ml/analytics")
 
 if __name__ == "__main__":
     # Verificar si es el proceso principal (no el reloader)

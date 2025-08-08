@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 
 const NetworkGraph = ({ data }) => {
+
   useEffect(() => {
     const applyModule = (mod, Highcharts) => {
       if (typeof mod === 'function') {
@@ -24,22 +25,11 @@ const NetworkGraph = ({ data }) => {
 
       // Paleta de colores morados que complementa el azul del sitio
       const purpleColors = [
-        '#8B5CF6', // Violeta principal
-        '#A855F7', // Púrpura brillante
-        '#9333EA', // Violeta intenso
-        '#7C3AED', // Violeta profundo
-        '#6D28D9', // Púrpura oscuro
-        '#5B21B6', // Violeta muy oscuro
-        '#DDD6FE', // Violeta claro
-        '#C4B5FD', // Lavanda
-        '#B794F6', // Púrpura suave
-        '#AD85EE'  // Violeta medio
+        '#8B5CF6', '#A855F7', '#9333EA', '#7C3AED', '#6D28D9', 
+        '#5B21B6', '#DDD6FE', '#C4B5FD', '#B794F6', '#AD85EE'
       ];
 
-      // Sobrescribir los colores por defecto de Highcharts
-      Highcharts.setOptions({
-        colors: purpleColors
-      });
+      Highcharts.setOptions({ colors: purpleColors });
 
       Highcharts.addEvent(
         Highcharts.Series,
@@ -54,20 +44,25 @@ const NetworkGraph = ({ data }) => {
             e.options.id === 'fake-news'
           ) {
             e.options.data.forEach(function (link) {
-              if (link[0] === 'Noticias Falsas en Tendencia') {
-                nodes['Noticias Falsas en Tendencia'] = {
-                  id: 'Noticias Falsas en Tendencia',
+              // Detectar el nodo central (tanto el original como el de la API)
+              if (link[0] === 'Noticias Falsas en Tendencia' || link[0] === 'Fake News Network') {
+                const mainNodeName = link[0];
+                // Nodo central más grande y azul
+                nodes[link[0]] = {
+                  id: link[0],
                   marker: { 
                     radius: 20,
-                    fillColor: '#4F46E5' // Azul índigo que combina con el sitio
+                    fillColor: '#4F46E5'
                   }
                 };
+                // Nodos de nivel 2 (temas) con colores únicos
                 nodes[link[1]] = {
                   id: link[1],
                   marker: { radius: 12 },
                   color: colors[i++ % colors.length]
                 };
               } else if (nodes[link[0]] && nodes[link[0]].color) {
+                // Mantener la lógica original para nodos hijos
                 nodes[link[1]] = {
                   id: link[1],
                   color: nodes[link[0]].color
@@ -83,7 +78,7 @@ const NetworkGraph = ({ data }) => {
       Highcharts.chart('container', {
         chart: {
           type: 'networkgraph',
-          height: 600,
+          height: 700,
           backgroundColor: 'transparent'
         },
         title: { text: null },
@@ -95,7 +90,7 @@ const NetworkGraph = ({ data }) => {
             link: {
               dashStyle: 'Dash',
               lineWidth: 1,
-              color: '#A855F7', // Color morado para las conexiones
+              color: '#A855F7',
               opacity: 0.6
             },
             layoutAlgorithm: {
@@ -113,7 +108,7 @@ const NetworkGraph = ({ data }) => {
             style: {
               fontSize: '0.8em',
               fontWeight: 'normal',
-              color: '#374151', // Gris oscuro para mejor legibilidad
+              color: '#374151',
               textOutline: '1px contrast'
             }
           },
@@ -148,11 +143,9 @@ const NetworkGraph = ({ data }) => {
           max-width: 800px;
           margin: 1em auto;
         }
-
-
       `}</style>
       <figure className="highcharts-figure">
-        <div id="container" style={{ height: '600px' }}></div>
+        <div id="container" style={{ height: '700px' }}></div>
       </figure>
     </>
   );

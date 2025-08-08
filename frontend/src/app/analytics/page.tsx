@@ -6,57 +6,12 @@ import TrendsChart from '@/components/analytics/TrendsChart';
 import ChartFilters from '@/components/analytics/ChartFilters';
 import SankeyChart from '@/components/analytics/graph/sankey/SankeyChart';
 import SankeyFilters from '@/components/analytics/filters/SankeyFilters';
+import { useNetworkGraph } from '@/hooks/useNetworkGraph';
 import Link from 'next/link';
 
-const fakeNewsData = [
-  ['Noticias Falsas en Tendencia', 'Salud'],
-  ['Noticias Falsas en Tendencia', 'Política'],
-  ['Noticias Falsas en Tendencia', 'Tecnología'],
-  ['Noticias Falsas en Tendencia', 'Finanzas'],
-  ['Salud', 'Vacunas'],
-  ['Salud', 'COVID'],
-  ['Vacunas', '5G'],
-  ['5G', 'ADN'],
-  ['Salud', 'Microchips'],
-  ['Microchips', 'ADN'],
-  ['Salud', 'Ajo'],
-  ['Salud', 'Oxígeno'],
-  ['Salud', 'Radiación'],
-  ['Política', 'Elección'],
-  ['Política', 'Fraude'],
-  ['Elección', 'Hackers'],
-  ['Hackers', 'Urnas'],
-  ['Política', 'Plandemia'],
-  ['Política', 'Dobles'],
-  ['Política', 'Dictadura'],
-  ['Política', 'Censura'],
-  ['Tecnología', 'ChatGPT'],
-  ['Tecnología', 'IA'],
-  ['IA', 'Control'],
-  ['Tecnología', 'Celulares'],
-  ['Celulares', 'Torres'],
-  ['Torres', 'Control'],
-  ['Tecnología', 'Vigilancia'],
-  ['Tecnología', 'Implantes'],
-  ['Microchips', 'Implantes'],
-  ['Tecnología', 'Drones'],
-  ['Finanzas', 'Dólar'],
-  ['Finanzas', 'Bitcoin'],
-  ['Finanzas', 'Illuminati'],
-  ['Finanzas', 'Crack'],
-  ['Finanzas', 'Colapso'],
-  ['Finanzas', 'Oro'],
-  ['Finanzas', 'Inversión'],
-  ['Finanzas', 'Banqueros'],
-  ['Bitcoin', 'Illuminati'],
-  ['Hackers', 'Bitcoin'],
-  ['Bitcoin', 'Fraude'],
-  ['Bitcoin', 'Inversión'],
-  ['5G', 'Torres'],
-  ['Oxígeno', 'Radiación']
-];
-
 export default function AnalyticsPage() {
+  const { data: networkData, loading: networkLoading, error: networkError } = useNetworkGraph();
+  
   const [filters, setFilters] = useState({
     dateRange: '7d',
     categories: ['Vacunas', 'COVID', '5G', 'Microchips', 'Radiación'],
@@ -70,10 +25,56 @@ export default function AnalyticsPage() {
     threshold: 'medium'
   });
 
-  // 🚀 Forzar recreación inicial del gráfico para evitar crash de Highcharts
-  useEffect(() => {
-    setFilters(prev => ({ ...prev }));
-  }, []);
+  // Componente de loading para el gráfico
+  const NetworkGraphSection = () => {
+    if (networkLoading) {
+      return (
+        <div className="w-full h-[500px] sm:h-[600px] flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando análisis de red...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (networkError) {
+      return (
+        <div className="w-full h-[500px] sm:h-[600px] flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-red-500 mb-4">
+              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <p className="text-gray-600">Error al cargar datos de red</p>
+            <p className="text-sm text-gray-500 mt-2">{networkError}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!networkData || networkData.length === 0) {
+      return (
+        <div className="w-full h-[500px] sm:h-[600px] flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-gray-400 mb-4">
+              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <p className="text-gray-600">No hay datos disponibles</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full h-[500px] sm:h-[600px]">
+        <NetworkGraph data={networkData} />
+      </div>
+    );
+  };
 
   return (
     <>
@@ -141,11 +142,9 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Gráfico */}
+        {/* Gráfico con estados de carga */}
         <div className="w-full lg:w-1/2 flex justify-center items-center">
-          <div className="w-full h-[500px] sm:h-[600px]">
-            <NetworkGraph data={fakeNewsData} />
-          </div>
+          <NetworkGraphSection />
         </div>
       </section>
 
