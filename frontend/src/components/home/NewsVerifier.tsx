@@ -40,6 +40,24 @@ const NewsVerifier = () => {
   const [result, setResult] = useState<VerificationResult | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    
+    // Auto-detect if input looks like a URL
+    const urlPattern = /^(https?:\/\/|www\.)/i;
+    const isUrl = urlPattern.test(value.trim());
+    
+    // Only auto-switch if there's actual content and it's different from current type
+    if (value.trim()) {
+      if (isUrl && inputType !== 'url') {
+        setInputType('url');
+      } else if (!isUrl && inputType !== 'text' && value.length > 10) {
+        // Switch to text if it's clearly not a URL and has substantial content
+        setInputType('text');
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -126,64 +144,88 @@ const NewsVerifier = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Input Type Toggle */}
-          <div className="flex gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => setInputType('text')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                inputType === 'text'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              Texto
-            </button>
-            <button
-              type="button"
-              onClick={() => setInputType('url')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                inputType === 'url'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <Link className="w-4 h-4" />
-              URL
-            </button>
+          <div className="flex mb-4">
+            <div className="relative bg-gray-100 rounded-lg p-1 flex">
+              {/* Background slider */}
+              <div 
+                className={`absolute top-1 bottom-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-md transition-transform duration-300 ease-in-out shadow-md ${
+                  inputType === 'url' ? 'translate-x-[calc(100%-0.25rem)]' : 'translate-x-0'
+                }`}
+                style={{ 
+                  width: 'calc(50% - 0.125rem)',
+                  left: '0.25rem'
+                }}
+              />
+              
+              {/* Text option */}
+              <button
+                type="button"
+                onClick={() => setInputType('text')}
+                className={`relative z-10 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ease-in-out flex items-center gap-2 min-w-[100px] justify-center overflow-hidden group ${
+                  inputType === 'text'
+                    ? 'text-white'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span className="relative z-10">Texto</span>
+                {/* Shimmer effect for active state */}
+                {inputType === 'text' && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                )}
+              </button>
+              
+              {/* URL option */}
+              <button
+                type="button"
+                onClick={() => setInputType('url')}
+                className={`relative z-10 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ease-in-out flex items-center gap-2 min-w-[100px] justify-center overflow-hidden group ${
+                  inputType === 'url'
+                    ? 'text-white'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                <Link className="w-4 h-4" />
+                <span className="relative z-10">URL</span>
+                {/* Shimmer effect for active state */}
+                {inputType === 'url' && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Input Field */}
           {inputType === 'text' ? (
             <textarea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
               placeholder="Pega aquí el texto de la noticia que quieres verificar..."
               rows={5}
-              className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full p-4 text-base text-gray-700 placeholder-gray-400 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200"
             />
           ) : (
             <input
               type="url"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
               placeholder="https://ejemplo.com/noticia"
-              className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full p-4 text-base text-gray-700 placeholder-gray-400 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
             />
           )}
 
-          {/* Submit Button */}
+          {/* Submit Button - Updated with gradient style and shimmer effect */}
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className={`w-full py-3 px-6 rounded-lg font-medium text-white transition-colors ${
+            className={`w-full py-3 px-6 rounded-lg font-medium text-white transition-all duration-300 overflow-hidden group relative ${
               isLoading || !input.trim()
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-md hover:shadow-lg'
             }`}
           >
             {isLoading ? (
-              <span className="flex items-center justify-center">
+              <span className="flex items-center justify-center relative z-10">
                 <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -191,10 +233,16 @@ const NewsVerifier = () => {
                 Verificando...
               </span>
             ) : (
-              <span className="flex items-center justify-center gap-2">
-                <Search className="w-5 h-5" />
-                Verificar Noticia
-              </span>
+              <>
+                <span className="flex items-center justify-center gap-2 relative z-10">
+                  <Search className="w-5 h-5" />
+                  Verificar Noticia
+                </span>
+                {/* Shimmer effect - only shown when not disabled */}
+                {!isLoading && input.trim() && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                )}
+              </>
             )}
           </button>
 
@@ -318,26 +366,6 @@ const NewsVerifier = () => {
                 news={news} 
               />
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Info Section */}
-      {!result && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <Info className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-lg font-medium text-blue-900 mb-2">¿Cómo funciona?</h3>
-              <ul className="text-blue-800 space-y-1 text-sm">
-                <li>• Analizamos el contenido usando inteligencia artificial</li>
-                <li>• Comparamos con fuentes verificadas y bases de datos</li>
-                <li>• Buscamos noticias relacionadas para mayor contexto</li>
-                <li>• Proporcionamos un nivel de confianza del análisis</li>
-              </ul>
-            </div>
           </div>
         </div>
       )}
