@@ -216,182 +216,145 @@ def get_network_graph_data():
             "message": f"Error generating network graph data: {str(e)}"
         }), 500
     
-@analytics_bp.route("/trends", methods=["GET"])
-def get_trends_data():
+
+@analytics_bp.route("/quick-stats", methods=["GET"])
+def get_dashboard_stats():
     """
-    Returns trending data for top 5 keywords based on news frequency.
-    Supports filtering by time period and veracity type.
+    Returns dashboard statistics including:
+    1. News analyzed today vs yesterday
+    2. Truth rate today vs yesterday  
+    3. Active topics count vs yesterday
+    4. Sources found today vs yesterday
     """
     try:
-        # Get query parameters
-        date_range = request.args.get('dateRange', '7d')
-        veracity = request.args.get('veracity', 'all')  # 'all', 'false', 'true'
+        # Get today's date range
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
         
-        # Calculate date range
-        end_date = datetime.now()
-        if date_range == '1d':
-            start_date = end_date - timedelta(days=1)
-            time_intervals = 6  # 4-hour intervals
-            interval_type = 'hour'
-        elif date_range == '7d':
-            start_date = end_date - timedelta(days=7)
-            time_intervals = 7  # daily intervals
-            interval_type = 'day'
-        elif date_range == '30d':
-            start_date = end_date - timedelta(days=30)
-            time_intervals = 4  # weekly intervals
-            interval_type = 'week'
-        elif date_range == '90d':
-            start_date = end_date - timedelta(days=90)
-            time_intervals = 3  # monthly intervals
-            interval_type = 'month'
-        else:
-            start_date = end_date - timedelta(days=7)
-            time_intervals = 7
-            interval_type = 'day'
+        today_start = datetime.combine(today, datetime.min.time())
+        today_end = datetime.combine(today, datetime.max.time())
+        yesterday_start = datetime.combine(yesterday, datetime.min.time())
+        yesterday_end = datetime.combine(yesterday, datetime.max.time())
         
-        # Base query for news with classifications
-        base_query = db.session.query(
-            Keyword.palabra,
-            Noticia.created_at,
-            ClasificacionNoticia.resultado
-        ).join(
-            NoticiaKeyword, NoticiaKeyword.keyword_id == Keyword.id
-        ).join(
-            Noticia, Noticia.id == NoticiaKeyword.noticia_id
-        ).join(
-            ClasificacionNoticia, ClasificacionNoticia.noticia_id == Noticia.id
+        # 1. News analyzed today vs yesterday
+        news_today = db.session.query(func.count(Noticia.id)).filter(
+            and_(
+                Noticia.created_at >= today_start,
+                Noticia.created_at <= today_end
+            )
+        ).scalar() or 0
+        
+        news_yesterday = db.session.query(func.count(Noticia.id)).filter(
+            and_(
+                Noticia.created_at >= yesterday_start,
+                Noticia.created_at <= yesterday_end
+            )
+        ).scalar() or 0
+        
+        news_change = calculate_percentage_change(news_yesterday, news_today)
+        
+        # 2. Truth rate today vs yesterday
+        true_news_today = db.session.query(func.count(ClasificacionNoticia.id)).join(
+            Noticia, Noticia.id == ClasificacionNoticia.noticia_id
         ).filter(
             and_(
-                Noticia.created_at >= start_date,
-                Noticia.created_at <= end_date
+                Noticia.created_at >= today_start,
+                Noticia.created_at <= today_end,
+                ClasificacionNoticia.resultado == 'verdadera'
             )
-        )
+        ).scalar() or 0
         
-        # Apply veracity filter
-        if veracity == 'false':
-            base_query = base_query.filter(ClasificacionNoticia.resultado == 'falsa')
-        elif veracity == 'true':
-            base_query = base_query.filter(ClasificacionNoticia.resultado == 'verdadera')
+        true_news_yesterday = db.session.query(func.count(ClasificacionNoticia.id)).join(
+            Noticia, Noticia.id == ClasificacionNoticia.noticia_id
+        ).filter(
+            and_(
+                Noticia.created_at >= yesterday_start,
+                Noticia.created_at <= yesterday_end,
+                ClasificacionNoticia.resultado == 'verdadera'
+            )
+        ).scalar() or 0
         
-        # Execute query
-        results = base_query.all()
+        truth_rate_today = (true_news_today / news_today * 100) if news_today > 0 else 0
+        truth_rate_yesterday = (true_news_yesterday / news_yesterday * 100) if news_yesterday > 0 else 0
+        truth_rate_change = truth_rate_today - truth_rate_yesterday
         
-        if not results:
-            logger.warning(f"No trending data found for period {date_range} with veracity {veracity}")
-            return jsonify({
-                "status": "success",
-                "data": {
-                    "categories": [],
-                    "series": []
-                },
-                "metadata": {
-                    "period": date_range,
-                    "veracity": veracity,
-                    "total_keywords": 0,
-                    "date_range": {
-                        "start": start_date.isoformat(),
-                        "end": end_date.isoformat()
-                    }
-                }
-            }), 200
+        # 3. Active topics count (topics that had news today vs yesterday)
+        active_topics_today = db.session.query(func.count(func.distinct(Noticia.tema_id))).filter(
+            and_(
+                Noticia.created_at >= today_start,
+                Noticia.created_at <= today_end,
+                Noticia.tema_id.isnot(None)
+            )
+        ).scalar() or 0
         
-        # Count keyword frequency to get top 5
-        keyword_counts = Counter([result.palabra for result in results])
-        top_keywords = [keyword for keyword, count in keyword_counts.most_common(5)]
+        active_topics_yesterday = db.session.query(func.count(func.distinct(Noticia.tema_id))).filter(
+            and_(
+                Noticia.created_at >= yesterday_start,
+                Noticia.created_at <= yesterday_end,
+                Noticia.tema_id.isnot(None)
+            )
+        ).scalar() or 0
         
-        # Generate time intervals
-        time_categories = []
-        if interval_type == 'hour':
-            for i in range(time_intervals):
-                hour = i * 4
-                time_categories.append(f"{hour:02d}:00")
-        elif interval_type == 'day':
-            days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-            for i in range(time_intervals):
-                day_date = start_date + timedelta(days=i)
-                day_name = days[day_date.weekday()]
-                time_categories.append(day_name)
-        elif interval_type == 'week':
-            for i in range(time_intervals):
-                week_num = i + 1
-                time_categories.append(f"Sem {week_num}")
-        elif interval_type == 'month':
-            for i in range(time_intervals):
-                month_num = i + 1
-                time_categories.append(f"Mes {month_num}")
+        topics_change = calculate_percentage_change(active_topics_yesterday, active_topics_today)
         
-        # Process data for each keyword
-        series_data = []
+        # 4. Sources found today vs yesterday
+        sources_today = db.session.query(func.count(func.distinct(Noticia.fuente_id))).filter(
+            and_(
+                Noticia.created_at >= today_start,
+                Noticia.created_at <= today_end,
+                Noticia.fuente_id.isnot(None)
+            )
+        ).scalar() or 0
         
-        for keyword in top_keywords:
-            # Filter results for this keyword
-            keyword_results = [r for r in results if r.palabra == keyword]
-            
-            # Initialize data array for time intervals
-            data = [0] * time_intervals
-            
-            # Count occurrences in each time interval
-            for result in keyword_results:
-                if interval_type == 'hour':
-                    # Calculate 4-hour interval index
-                    hours_diff = (result.created_at - start_date).total_seconds() / 3600
-                    interval_idx = min(int(hours_diff // 4), time_intervals - 1)
-                elif interval_type == 'day':
-                    # Calculate day index
-                    days_diff = (result.created_at - start_date).days
-                    interval_idx = min(days_diff, time_intervals - 1)
-                elif interval_type == 'week':
-                    # Calculate week index
-                    days_diff = (result.created_at - start_date).days
-                    interval_idx = min(days_diff // 7, time_intervals - 1)
-                elif interval_type == 'month':
-                    # Calculate month index (approximate)
-                    days_diff = (result.created_at - start_date).days
-                    interval_idx = min(days_diff // 30, time_intervals - 1)
-                
-                if 0 <= interval_idx < time_intervals:
-                    data[interval_idx] += 1
-            
-            # Create series object (only data, no visual properties)
-            series_data.append({
-                "name": keyword.title(),
-                "data": data
-            })
+        sources_yesterday = db.session.query(func.count(func.distinct(Noticia.fuente_id))).filter(
+            and_(
+                Noticia.created_at >= yesterday_start,
+                Noticia.created_at <= yesterday_end,
+                Noticia.fuente_id.isnot(None)
+            )
+        ).scalar() or 0
         
-        # Calculate metadata
-        total_news = len(results)
-        metadata = {
-            "period": date_range,
-            "veracity": veracity,
-            "total_keywords": len(top_keywords),
-            "total_news": total_news,
-            "date_range": {
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat()
-            },
-            "top_keywords": [
-                {
-                    "keyword": keyword,
-                    "count": keyword_counts[keyword]
-                } for keyword in top_keywords
-            ]
-        }
-        
-        logger.info(f"Trends data generated: {len(top_keywords)} keywords, {total_news} news articles")
+        sources_change = calculate_percentage_change(sources_yesterday, sources_today)
         
         return jsonify({
             "status": "success",
             "data": {
-                "categories": time_categories,
-                "series": series_data
+                "news_analyzed": {
+                    "value": news_today,
+                    "change": news_change,
+                    "trend": "up" if news_change > 0 else "down" if news_change < 0 else "stable"
+                },
+                "truth_rate": {
+                    "value": round(truth_rate_today, 1),
+                    "change": round(truth_rate_change, 1),
+                    "trend": "up" if truth_rate_change > 0 else "down" if truth_rate_change < 0 else "stable"
+                },
+                "active_topics": {
+                    "value": active_topics_today,
+                    "change": topics_change,
+                    "trend": "up" if topics_change > 0 else "down" if topics_change < 0 else "stable"
+                },
+                "sources_found": {
+                    "value": sources_today,
+                    "change": sources_change,
+                    "trend": "up" if sources_change > 0 else "down" if sources_change < 0 else "stable"
+                }
             },
-            "metadata": metadata
+            "metadata": {
+                "date": today.isoformat(),
+                "comparison_date": yesterday.isoformat()
+            }
         }), 200
         
     except Exception as e:
-        logger.error(f"Error generating trends data: {str(e)}")
+        logger.error(f"Error generating dashboard stats: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Error generating trends data: {str(e)}"
+            "message": f"Error generating dashboard stats: {str(e)}"
         }), 500
+
+def calculate_percentage_change(old_value, new_value):
+    """Calculate percentage change between two values"""
+    if old_value == 0:
+        return 100.0 if new_value > 0 else 0.0
+    return round(((new_value - old_value) / old_value) * 100, 1)

@@ -6,11 +6,14 @@ import TrendsChart from '@/components/analytics/TrendsChart';
 import ChartFilters from '@/components/analytics/ChartFilters';
 import SankeyChart from '@/components/analytics/graph/sankey/SankeyChart';
 import SankeyFilters from '@/components/analytics/filters/SankeyFilters';
+import QuickStats from '@/components/analytics/QuickStats';
 import { useNetworkGraph } from '@/hooks/useNetworkGraph';
+import { useDashboardStats } from '@/hooks/useQuickStats';
 import Link from 'next/link';
 
 export default function AnalyticsPage() {
   const { data: networkData, loading: networkLoading, error: networkError } = useNetworkGraph();
+  const { stats: dashboardStats, loading: statsLoading, error: statsError } = useDashboardStats();
   
   const [filters, setFilters] = useState({
     dateRange: '7d',
@@ -71,7 +74,7 @@ export default function AnalyticsPage() {
 
     return (
       <div className="w-full h-[500px] sm:h-[600px]">
-        <NetworkGraph data={networkData} />
+        <div className='-mt-15'><NetworkGraph data={networkData} /></div>
       </div>
     );
   };
@@ -161,67 +164,13 @@ export default function AnalyticsPage() {
             </p>
           </div>
 
-          {/* Métricas principales */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Noticias Analizadas</p>
-                  <p className="text-2xl font-bold text-gray-900">12,847</p>
-                  <p className="text-xs text-green-600 mt-1">↗ +8.2% vs ayer</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Tasa de Veracidad</p>
-                  <p className="text-2xl font-bold text-gray-900">73.2%</p>
-                  <p className="text-xs text-green-600 mt-1">↗ +2.1% vs ayer</p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Alertas Activas</p>
-                  <p className="text-2xl font-bold text-gray-900">23</p>
-                  <p className="text-xs text-red-600 mt-1">↗ +4 vs ayer</p>
-                </div>
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Fuentes Verificadas</p>
-                  <p className="text-2xl font-bold text-gray-900">1,247</p>
-                  <p className="text-xs text-green-600 mt-1">↗ +12 vs ayer</p>
-                </div>
-                <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
+          {/* Métricas principales - Usando componente con datos reales */}
+          <div className="mb-12">
+            <QuickStats 
+              stats={dashboardStats} 
+              loading={statsLoading} 
+              error={statsError} 
+            />
           </div>
         </div>
       </section>
@@ -281,7 +230,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Tema Crítico</p>
-                  <p className="text-2xl font-bold text-gray-900">Fraude Electoral</p>
+                  <p className="text-2xl font-bold text-gray-900">Salud Mental</p>
                   <p className="text-xs text-red-600 mt-1">Mayor tasa detectada</p>
                 </div>
                 <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
