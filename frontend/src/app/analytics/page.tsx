@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import NetworkGraph from '@/components/analytics/graph/networkgraph/NetworkGraph';
-import TrendsChart from '@/components/analytics/TrendsChart';
-import ChartFilters from '@/components/analytics/ChartFilters';
-import SankeyChart from '@/components/analytics/graph/sankey/SankeyChart';
+import NetworkGraph from '@/components/analytics/graph/NetworkGraph';
+import TrendsChart from '@/components/analytics/graph/TrendsChart';
+import ChartFilters from '@/components/analytics/filters/ChartFilters';
+import SankeyChart from '@/components/analytics/graph/SankeyChart';
 import SankeyFilters from '@/components/analytics/filters/SankeyFilters';
 import QuickStats from '@/components/analytics/QuickStats';
 import { useNetworkGraph } from '@/hooks/useNetworkGraph';
