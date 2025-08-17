@@ -1,7 +1,7 @@
 // hooks/useNetworkGraph.ts
 import { useState, useEffect } from 'react';
 
-const API_BASE_URL = 'https://ml.healthcheck.news/api';
+const API_BASE_URL = 'https://ml.healthcheck.news';
 
 // Network Graph Types
 export interface NetworkData {
