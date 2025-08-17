@@ -1,8 +1,8 @@
-
 'use client';
 
 import { useEffect, useRef } from 'react';
 import * as Highcharts from 'highcharts';
+import { useTrendsData, generateCategories } from '@/services/analytics/charts';
 
 let Highcharts3D;
 if (typeof window !== 'undefined') {
@@ -15,191 +15,167 @@ if (typeof window !== 'undefined') {
 const TrendsChart = ({ filters }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+  
+  const { data, loading, error, refetch } = useTrendsData(filters);
 
-  const generateData = (dateRange, categories) => {
-    const dataMap = {
-      '1d': {
-        categories: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-        data: {
-          'Vacunas': [45, 38, 42, 35, 28, 25],
-          'COVID': [23, 19, 22, 26, 29, 31],
-          '5G': [34, 29, 25, 22, 18, 15],
-          'Microchips': [12, 10, 8, 6, 5, 4],
-          'Radiación': [8, 7, 9, 8, 6, 5],
-          'Ajo': [5, 4, 3, 2, 2, 1],
-          'Oxígeno': [3, 2, 4, 3, 2, 2]
+  const colorPalette = [
+    { line: 'rgb(59, 130, 246)', fill: 'rgba(59, 130, 246, 0.8)' },
+    { line: 'rgb(79, 70, 229)', fill: 'rgba(79, 70, 229, 0.8)' },
+    { line: 'rgb(139, 92, 246)', fill: 'rgba(139, 92, 246, 0.8)' },
+    { line: 'rgb(6, 182, 212)', fill: 'rgba(6, 182, 212, 0.8)' },
+    { line: 'rgb(16, 185, 129)', fill: 'rgba(16, 185, 129, 0.8)' }
+  ];
+
+  const updateChart = (chartData) => {
+    if (!chartRef.current) return;
+
+    const categories = generateCategories(filters.dateRange || '7d');
+    const series = chartData.series.map((s, index) => ({
+      ...s,
+      lineColor: colorPalette[index]?.line || '#6b7280',
+      color: colorPalette[index]?.fill || 'rgba(107, 114, 128, 0.8)',
+      fillColor: colorPalette[index]?.fill || 'rgba(107, 114, 128, 0.8)'
+    }));
+
+    const config = {
+      chart: {
+        type: 'area',
+        height: 400,
+        backgroundColor: 'transparent',
+        options3d: {
+          enabled: true,
+          alpha: 15,
+          beta: 30,
+          depth: 300,
+          viewDistance: 25
+        },
+        margin: [60, 20, 60, 80]
+      },
+      exporting: { enabled: false },
+      title: { text: null },
+      yAxis: {
+        title: { text: 'Noticias Detectadas', x: -40 },
+        labels: { format: '{value:,.0f}' },
+        gridLineDashStyle: 'Dash',
+        gridLineColor: '#f3f4f6'
+      },
+      xAxis: {
+        categories: categories,
+        gridLineWidth: 1,
+        gridLineColor: '#f3f4f6',
+        labels: { style: { fontSize: '12px', color: '#6b7280' } }
+      },
+      plotOptions: {
+        area: {
+          depth: 150,
+          marker: { enabled: false },
+          stacking: null
         }
       },
-      '7d': {
-        categories: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
-        data: {
-          'Vacunas': [245, 198, 156, 134, 98, 87, 65],
-          'COVID': [89, 76, 65, 78, 89, 95, 102],
-          '5G': [178, 156, 134, 123, 98, 76, 54],
-          'Microchips': [67, 54, 43, 38, 29, 23, 18],
-          'Radiación': [34, 28, 31, 27, 24, 19, 16],
-          'Ajo': [23, 19, 15, 12, 9, 7, 5],
-          'Oxígeno': [15, 12, 14, 11, 8, 6, 4]
+      legend: {
+        align: 'center',
+        verticalAlign: 'top',
+        layout: 'horizontal',
+        itemStyle: { cursor: 'pointer' },
+        x: 0,
+        y: 10,
+        itemMarginRight: 20
+      },
+      tooltip: {
+        backgroundColor: 'white',
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+        shadow: true,
+        useHTML: true,
+        formatter: function () {
+          return `<div style="padding: 8px;">
+            <strong>${this.series.name}</strong><br/>
+            <span style="color: ${this.series.color};">●</span> ${categories[this.point.x]}: <strong>${this.y} noticias</strong>
+          </div>`;
         }
       },
-      '30d': {
-        categories: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
-        data: {
-          'Vacunas': [1245, 1098, 856, 634],
-          'COVID': [489, 576, 665, 702],
-          '5G': [878, 756, 634, 423],
-          'Microchips': [267, 154, 143, 98],
-          'Radiación': [134, 128, 131, 97],
-          'Ajo': [89, 67, 45, 23],
-          'Oxígeno': [67, 54, 43, 32]
-        }
-      },
-      '90d': {
-        categories: ['Mes 1', 'Mes 2', 'Mes 3'],
-        data: {
-          'Vacunas': [3245, 2798, 1956],
-          'COVID': [1289, 1576, 1965],
-          '5G': [2178, 1756, 1234],
-          'Microchips': [867, 654, 443],
-          'Radiación': [434, 328, 231],
-          'Ajo': [223, 167, 105],
-          'Oxígeno': [167, 134, 103]
-        }
+      series: series,
+      credits: { enabled: false }
+    };
+
+    // Safely destroy previous chart
+    if (chartInstance.current) {
+      try { 
+        chartInstance.current.destroy(); 
+      } catch (e) {
+        console.warn('Chart destroy error:', e);
       }
-    };
+      chartInstance.current = null;
+    }
 
-    const timeData = dataMap[dateRange] || dataMap['7d'];
-    const colors = {
-      'Vacunas': { line: 'rgb(59, 130, 246)', fill: 'rgba(59, 130, 246, 0.8)' },
-      'COVID': { line: 'rgb(79, 70, 229)', fill: 'rgba(79, 70, 229, 0.8)' },
-      '5G': { line: 'rgb(139, 92, 246)', fill: 'rgba(139, 92, 246, 0.8)' },
-      'Microchips': { line: 'rgb(6, 182, 212)', fill: 'rgba(6, 182, 212, 0.8)' },
-      'Radiación': { line: 'rgb(16, 185, 129)', fill: 'rgba(16, 185, 129, 0.8)' },
-      'Ajo': { line: 'rgb(14, 165, 233)', fill: 'rgba(14, 165, 233, 0.8)' },
-      'Oxígeno': { line: 'rgb(34, 197, 94)', fill: 'rgba(34, 197, 94, 0.8)' }
-    };
-
-    return {
-      categories: timeData.categories,
-      series: categories
-        .filter(category => timeData.data[category])
-        .map(category => {
-          return {
-            name: category,
-            data: timeData.data[category],
-            lineColor: colors[category]?.line || '#6b7280',
-            color: colors[category]?.fill || 'rgba(107, 114, 128, 0.8)',
-            fillColor: colors[category]?.fill || 'rgba(107, 114, 128, 0.8)',
-            visible: true,
-            showInLegend: true,
-            enableMouseTracking: true
-          };
-        })
-    };
-  };
-
-  useEffect(() => {
+    // Clear container safely
     if (chartRef.current) {
-      const chartData = generateData(filters.dateRange, filters.categories);
-
-      const config = {
-        chart: {
-          type: 'area',
-          renderTo: chartRef.current,
-          height: 400,
-          backgroundColor: 'transparent',
-          options3d: {
-            enabled: true,
-            alpha: 15,
-            beta: 30,
-            depth: 300,
-            viewDistance: 25
-          },
-          margin: [60, 20, 60, 80]
-        },
-        exporting: { enabled: false },
-        title: { text: null },
-        yAxis: {
-          title: { text: 'Noticias Detectadas', x: -40 },
-          labels: { format: '{value:,.0f}' },
-          gridLineDashStyle: 'Dash',
-          gridLineColor: '#f3f4f6'
-        },
-        xAxis: {
-          categories: chartData.categories,
-          gridLineWidth: 1,
-          gridLineColor: '#f3f4f6',
-          labels: { style: { fontSize: '12px', color: '#6b7280' } }
-        },
-        plotOptions: {
-          area: {
-            depth: 150,
-            marker: { enabled: false },
-            stacking: null
-          }
-        },
-        legend: {
-          align: 'center',
-          verticalAlign: 'top',
-          layout: 'horizontal',
-          itemStyle: { cursor: 'pointer' },
-          x: 0,
-          y: 10,
-          itemMarginRight: 20
-        },
-        tooltip: {
-          backgroundColor: 'white',
-          borderColor: '#e5e7eb',
-          borderRadius: 8,
-          shadow: true,
-          useHTML: true,
-          formatter: function () {
-            return `<div style="padding: 8px;">
-              <strong>${this.series.name}</strong><br/>
-              <span style="color: ${this.series.color};">●</span> ${chartData.categories[this.point.x]}: <strong>${this.y} noticias</strong>
-            </div>`;
-          }
-        },
-        series: chartData.series.map(s => ({
-          ...s,
-          states: {
-            ...(s.states || {}),
-            inactive: {
-              ...(s.states?.inactive || {}),
-              enabled: true,
-              opacity: 0.2
-            },
-            hover: {
-              ...(s.states?.hover || {}),
-              enabled: true
-            }
-          }
-        })),
-        credits: { enabled: false }
-      };
-
-      if (chartInstance.current) {
-        try { chartInstance.current.destroy(); } catch {}
-        chartInstance.current = null;
+      try {
+        chartRef.current.innerHTML = '';
+      } catch (e) {
+        console.warn('Clear container error:', e);
       }
+    }
 
-      chartRef.current.innerHTML = '';
-      setTimeout(() => {
+    // Create new chart with delay
+    setTimeout(() => {
+      if (chartRef.current) {
         try {
-          chartInstance.current = new Highcharts.Chart(config);
+          chartInstance.current = Highcharts.chart(chartRef.current, config);
         } catch (error) {
           console.error('Error creating chart:', error);
         }
-      }, 10);
+      }
+    }, 50);
+  };
+
+  useEffect(() => {
+    if (data) {
+      updateChart(data);
     }
 
+    // Cleanup function
     return () => {
       if (chartInstance.current) {
-        try { chartInstance.current.destroy(); } catch {}
+        try { 
+          chartInstance.current.destroy(); 
+        } catch (e) {
+          console.warn('Cleanup error:', e);
+        }
         chartInstance.current = null;
       }
     };
-  }, [filters]);
+  }, [data, filters.dateRange]);
+
+  if (loading) {
+    return (
+      <div className="w-full h-[400px] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-[400px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-2">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-1">Error al cargar datos</h3>
+          <p className="text-sm text-gray-500 mb-3">{error}</p>
+          <button 
+            onClick={refetch}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return <div ref={chartRef} className="w-full h-[400px]" />;
 };

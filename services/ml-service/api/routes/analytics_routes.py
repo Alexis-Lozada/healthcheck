@@ -358,3 +358,111 @@ def calculate_percentage_change(old_value, new_value):
     if old_value == 0:
         return 100.0 if new_value > 0 else 0.0
     return round(((new_value - old_value) / old_value) * 100, 1)
+
+@analytics_bp.route("/trends", methods=["GET"])
+def get_trends_data():
+    """Returns trending keywords data for charts"""
+    try:
+        date_range = request.args.get('date_range', '7d')
+        truth_status = request.args.get('truth_status', 'all')
+        limit_keywords = int(request.args.get('limit', 5))
+        
+        # Calculate date range
+        end_date = datetime.now()
+        if date_range == '1d':
+            start_date = end_date - timedelta(days=1)
+            intervals = 6  # 4-hour intervals
+            interval_hours = 4
+        elif date_range == '7d':
+            start_date = end_date - timedelta(days=7)
+            intervals = 7  # daily
+            interval_hours = 24
+        elif date_range == '30d':
+            start_date = end_date - timedelta(days=30)
+            intervals = 4  # weekly
+            interval_hours = 24 * 7
+        else:  # 90d
+            start_date = end_date - timedelta(days=90)
+            intervals = 3  # monthly
+            interval_hours = 24 * 30
+            
+        logger.info(f"Date range: {start_date} to {end_date}, intervals: {intervals}")
+        
+        # Get top keywords
+        query = db.session.query(
+            Keyword.palabra,
+            func.count(NoticiaKeyword.keyword_id).label('count')
+        ).join(NoticiaKeyword).join(Noticia).filter(
+            and_(
+                Noticia.fecha_publicacion >= start_date,
+                Noticia.fecha_publicacion.isnot(None)  # Only news with publication date
+            )
+        )
+        
+        # Only add classification filter if not 'all'
+        if truth_status != 'all' and truth_status in ['verdadera', 'falsa']:
+            query = query.join(ClasificacionNoticia).filter(
+                ClasificacionNoticia.resultado == truth_status
+            )
+        
+        top_keywords = query.group_by(Keyword.palabra).order_by(
+            desc('count')
+        ).limit(limit_keywords).all()
+        
+        # Get data for each keyword and time interval
+        series = []
+        for keyword, _ in top_keywords:
+            data = []
+            for i in range(intervals):
+                interval_start = start_date + timedelta(hours=i * interval_hours)
+                interval_end = start_date + timedelta(hours=(i + 1) * interval_hours)
+                
+                # Make sure we don't go beyond current time
+                if interval_start > end_date:
+                    data.append(0)
+                    continue
+                    
+                if interval_end > end_date:
+                    interval_end = end_date
+                
+                count_query = db.session.query(func.count(NoticiaKeyword.keyword_id)).join(
+                    Keyword
+                ).join(Noticia).filter(
+                    and_(
+                        Keyword.palabra == keyword,
+                        Noticia.fecha_publicacion >= interval_start,
+                        Noticia.fecha_publicacion < interval_end,
+                        Noticia.fecha_publicacion.isnot(None)  # Only news with publication date
+                    )
+                )
+                
+                # Only add classification filter if not 'all'
+                if truth_status != 'all' and truth_status in ['verdadera', 'falsa']:
+                    count_query = count_query.join(ClasificacionNoticia).filter(
+                        ClasificacionNoticia.resultado == truth_status
+                    )
+                
+                count = count_query.scalar() or 0
+                data.append(count)
+            
+            # Only add series if it has data (not all zeros)
+            if any(value > 0 for value in data):
+                series.append({
+                    "name": keyword,
+                    "data": data
+                })
+        
+        # If no series have data, return empty but valid response
+        if not series:
+            logger.warning("No data found for the specified filters")
+            
+        return jsonify({
+            "status": "success",
+            "data": {
+                "series": series
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500

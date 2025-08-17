@@ -17,9 +17,7 @@ export default function AnalyticsPage() {
   
   const [filters, setFilters] = useState({
     dateRange: '7d',
-    categories: ['Vacunas', 'COVID', '5G', 'Microchips', 'Radiación'],
-    veracity: 'all',
-    sources: 'all'
+    truthStatus: 'all'
   });
 
   const [sankeyFilters, setSankeyFilters] = useState({
