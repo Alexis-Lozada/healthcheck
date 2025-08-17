@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { AlertTriangle, CheckCircle, Newspaper, ExternalLink, Calendar, BarChart, Info, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
 
 // Definimos la URL base de la API Gateway
-const API_URL = 'http://localhost:3003/api';
+const API_URL = 'https://news.healthcheck.news/api';
 // URL de la API de Microlink
 const MICROLINK_API = 'https://api.microlink.io';
 

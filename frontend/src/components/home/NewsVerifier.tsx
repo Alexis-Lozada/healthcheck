@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { FileText, Link, Search, CheckCircle, XCircle, Info, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import RelatedNewsCard from '@/components/news/RelatedNewsCard';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URLs || 'http://localhost:5000/api';
+const API_URL = 'https://ml.healthcheck.news/api';
 
 interface RelatedNews {
   title: string;
