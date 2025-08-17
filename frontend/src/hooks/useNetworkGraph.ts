@@ -1,7 +1,7 @@
 // hooks/useNetworkGraph.ts
 import { useState, useEffect } from 'react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URLs || 'http://localhost:5000';
+const API_BASE_URL = 'https://ml.healthcheck.news/api';
 
 // Network Graph Types
 export interface NetworkData {
